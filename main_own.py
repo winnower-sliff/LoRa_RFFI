@@ -13,15 +13,15 @@ from sklearn.neighbors import KNeighborsClassifier
 from sklearn.metrics import confusion_matrix, accuracy_score, roc_curve, auc
 from tqdm import tqdm
 
-from signal_trans import ChannelIndSpectrogram, awgn
-from net import TripletLoss, TripletDataset
+from signal_trans import *
+from net import *
 from utils import *
 
 
 # 数据准备与模型训练
 # 调整后的模型准备和训练调用
 def prepare_and_train(
-    data, labels, dev_range, batch_size=32, num_epochs=100, learning_rate=1e-3
+    data, labels, dev_range, batch_size=32, num_epochs=200, learning_rate=1e-3
 ):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -54,10 +54,10 @@ def prepare_and_train(
     loss_perepoch = []
 
     for epoch in range(num_epochs):
-        start_time = time.time()
+        start_time_ep = time.time()
         total_loss = 0.0
         pbar = tqdm(
-            enumerate(train_loader), total=len(train_loader), desc=f"Epoch {epoch}:"
+            enumerate(train_loader), total=len(train_loader), desc=f"Epoch {epoch}"
         )
         for batch_idx, (anchor, positive, negative) in pbar:
             anchor, positive, negative = (
@@ -79,14 +79,20 @@ def prepare_and_train(
 
             total_loss += loss.item()
 
-        end_time = time.time()
+        end_time_ep = time.time()
 
+
+        loss_ep=total_loss/len(train_loader)*10
         print(
             f"Epoch [{epoch+1}/{num_epochs}],",
-            f"time: {end_time-start_time:.2f}s,",
-            f"Loss: {total_loss/len(train_loader):.6f}",
+            f"time: {end_time_ep-start_time_ep:.2f}s,",
+            f"Loss: {loss_ep:.6f}",
         )
-        loss_perepoch.append(total_loss / len(train_loader))
+        loss_perepoch.append(loss_ep)
+
+        if (epoch + 1) in [100, 150, 200]:
+            print(f"Extractor {epoch+1} saving...")
+            save_model(model=model, file_path=f"Extractor_{epoch+1}.pth")
 
     print("Plotting results... ")
     fig, ax1 = plt.subplots()
@@ -185,6 +191,7 @@ def test_classification(
     conf_mat = confusion_matrix(true_label, pred_label)
     plt.figure()
     sns.heatmap(conf_mat, annot=True, fmt="d", cmap="Blues", cbar=False)
+    plt.title("Epoch 200")
     plt.xlabel("Predicted label")
     plt.ylabel("True label")
     plt.show()
@@ -297,7 +304,7 @@ def test_rogue_device_detection(
     plt.plot([0, 1], [0, 1], "k--")
     plt.xlabel("False positive rate")
     plt.ylabel("True positive rate")
-    plt.title("ROC Curve")
+    plt.title("ROC Curve    Ex 200")
     plt.legend(loc="lower right")
     plt.show()
 
@@ -308,7 +315,7 @@ def test_rogue_device_detection(
 if __name__ == "__main__":
     # 指定要运行的任务: "Train" / "Classification" / "Rogue Device Detection"
     mode_class = ["Train", "Classification", "Rogue Device Detection"]
-    mode_type = 1
+    mode_type = 2
     run_for = mode_class[mode_type]
 
     if run_for == "Train":
@@ -343,13 +350,7 @@ if __name__ == "__main__":
                 labels = f["labels"][:]
 
         # 训练特征提取模型
-        feature_extractor = prepare_and_train(
-            data,
-            labels,
-            dev_range,
-            batch_size=32,
-            num_epochs=100,
-        )
+        feature_extractor = prepare_and_train(data, labels, dev_range)
 
         # 保存训练好的模型
         save_model(feature_extractor)
@@ -361,7 +362,7 @@ if __name__ == "__main__":
         test_dev_range = np.arange(30, 40, dtype=int)
 
         # 执行分类任务
-        model = load_model("Extractor.pth")
+        model = load_model("Extractor_200.pth")
         pred_label, true_label, acc = test_classification(
             model,
             file_path_enrol="./dataset/Test/dataset_residential.h5",
@@ -376,7 +377,7 @@ if __name__ == "__main__":
         print("Rogue Device Detection mode entering...")
 
         # 执行恶意设备检测任务
-        model = load_model("Extractor.pth")
+        model = load_model("Extractor_200.pth")
         fpr, tpr, roc_auc, eer = test_rogue_device_detection(
             model,
             file_path_enrol="./dataset/Test/dataset_residential.h5",
