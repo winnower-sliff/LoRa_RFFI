@@ -1,5 +1,9 @@
+import numpy as np
+
+import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch.utils.data import Dataset
 
 
 # 定义残差块
@@ -76,3 +80,43 @@ class TripletNet(nn.Module):
 
     def triplet_loss(self, anchor, positive, negative):
         return TripletLoss.apply(anchor, positive, negative, self.margin)
+
+
+# 自定义Dataset类，用于三元组生成
+# 更新后的 TripletDataset 类
+class TripletDataset(Dataset):
+    def __init__(self, data, labels, dev_range):
+        self.data = data
+        self.labels = labels
+        self.dev_range = dev_range
+
+    def __len__(self):
+        return len(self.labels)
+
+    def __getitem__(self, idx):
+        anchor, positive, negative = self._get_triplet()
+        return (
+            torch.tensor(anchor, dtype=torch.float32).unsqueeze(0),
+            torch.tensor(positive, dtype=torch.float32).unsqueeze(0),
+            torch.tensor(negative, dtype=torch.float32).unsqueeze(0),
+        )
+
+    def _get_triplet(self):
+        """随机选择一个三元组 (anchor, positive, negative)"""
+        anchor_label = np.random.choice(self.dev_range)
+        positive_label = anchor_label
+        negative_label = np.random.choice(
+            [label for label in self.dev_range if label != anchor_label]
+        )
+
+        anchor = self._sample_by_label(anchor_label)
+        positive = self._sample_by_label(positive_label)
+        negative = self._sample_by_label(negative_label)
+
+        return anchor, positive, negative
+
+    def _sample_by_label(self, label):
+        """从数据中根据标签选择样本"""
+        indices = np.where(self.labels == label)[0]
+        idx = np.random.choice(indices)
+        return self.data[idx]

@@ -1,3 +1,4 @@
+import math
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -11,7 +12,7 @@ from sklearn.neighbors import KNeighborsClassifier
 from sklearn.metrics import confusion_matrix, accuracy_score, roc_curve, auc
 
 from signal_trans import ChannelIndSpectrogram, awgn
-from net import TripletLoss
+from net import TripletLoss, TripletDataset
 from utils import *
 
 
@@ -30,6 +31,7 @@ def prepare_and_train(
     # 生成数据加载器
     train_dataset = TripletDataset(data_train, labels_train, dev_range)
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+    batch_num = math.ceil(len(train_dataset) / batch_size)
 
     # 初始化模型和优化器
     model = TripletNet()
@@ -39,6 +41,18 @@ def prepare_and_train(
     # 训练模型
     model.to(device)
     model.train()
+
+    # 临时值
+    num_epochs = 2
+    batch_num = 1
+    print(
+        "\n-----------------\n"
+        "Num of epoch: {}\n"
+        "Batch size: {}\n"
+        "Num of train batch: {}\n"
+        "-----------------\n".format(num_epochs, batch_size, batch_num)
+    )
+
     for epoch in range(num_epochs):
         total_loss = 0.0
         for batch_idx, (anchor, positive, negative) in enumerate(train_loader):
@@ -217,11 +231,14 @@ if __name__ == "__main__":
     run_for = "Train"
 
     if run_for == "Train":
+        print("Train mode entering...")
+
         data_path = "./dataset/Train/dataset_training_aug.h5"
+        save_data = "./train_data.h5"
         dev_range = np.arange(0, 30, dtype=int)
         pkt_range = np.arange(0, 1000, dtype=int)
         snr_range = np.arange(20, 80)
-        if not os.path.exists("./tmp.h5"):
+        if not os.path.exists(save_data):
             print("Data Converting...")
 
             # 加载数据并开始训练
@@ -233,12 +250,14 @@ if __name__ == "__main__":
             ChannelIndSpectrogramObj = ChannelIndSpectrogram()
             data = ChannelIndSpectrogramObj.channel_ind_spectrogram(data)
 
-            with h5py.File("./tmp.h5", "w") as f:
+            data = np.squeeze(data, axis=3)
+
+            with h5py.File(save_data, "w") as f:
                 f.create_dataset("data", data=data)
                 f.create_dataset("labels", data=labels)
         else:
             print("Data loading...")
-            with h5py.File("tmp.h5", "r") as f:
+            with h5py.File(save_data, "r") as f:
                 data = f["data"][:]
                 labels = f["labels"][:]
 
@@ -249,6 +268,8 @@ if __name__ == "__main__":
         save_model(feature_extractor)
 
     elif run_for == "Classification":
+        print("Classification mode entering...")
+
         # 指定设备索引范围用于分类任务
         test_dev_range = np.arange(30, 40, dtype=int)
 
@@ -265,6 +286,8 @@ if __name__ == "__main__":
         )
 
     elif run_for == "Rogue Device Detection":
+        print("Rogue Device Detection mode entering...")
+
         # 执行恶意设备检测任务
         model = load_model("Extractor.pth")
         fpr, tpr, roc_auc, eer = test_rogue_device_detection(
