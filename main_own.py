@@ -1,4 +1,5 @@
 import math
+import time
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -10,6 +11,7 @@ from torch.utils.data import DataLoader
 from sklearn.model_selection import train_test_split
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.metrics import confusion_matrix, accuracy_score, roc_curve, auc
+from tqdm import tqdm
 
 from signal_trans import ChannelIndSpectrogram, awgn
 from net import TripletLoss, TripletDataset
@@ -42,9 +44,6 @@ def prepare_and_train(
     model.to(device)
     model.train()
 
-    # 临时值
-    num_epochs = 2
-    batch_num = 1
     print(
         "\n-----------------\n"
         "Num of epoch: {}\n"
@@ -52,10 +51,15 @@ def prepare_and_train(
         "Num of train batch: {}\n"
         "-----------------\n".format(num_epochs, batch_size, batch_num)
     )
+    loss_perepoch = []
 
     for epoch in range(num_epochs):
+        start_time = time.time()
         total_loss = 0.0
-        for batch_idx, (anchor, positive, negative) in enumerate(train_loader):
+        pbar = tqdm(
+            enumerate(train_loader), total=len(train_loader), desc=f"Epoch {epoch}:"
+        )
+        for batch_idx, (anchor, positive, negative) in pbar:
             anchor, positive, negative = (
                 anchor.to(device),
                 positive.to(device),
@@ -74,9 +78,35 @@ def prepare_and_train(
             optimizer.step()
 
             total_loss += loss.item()
+
+        end_time = time.time()
+
         print(
-            f"Epoch [{epoch+1}/{num_epochs}], Loss: {total_loss/len(train_loader):.4f}"
+            f"Epoch [{epoch+1}/{num_epochs}],",
+            f"time: {end_time-start_time:.2f}s,",
+            f"Loss: {total_loss/len(train_loader):.6f}",
         )
+        loss_perepoch.append(total_loss / len(train_loader))
+
+    print("Plotting results... ")
+    fig, ax1 = plt.subplots()
+    ax1.plot(
+        range(len(loss_perepoch)),
+        loss_perepoch,
+        label="Loss",
+        color="red",
+    )
+    ax1.set_xlabel("Epoch")
+    ax1.set_ylabel("Loss", color="red")
+    ax1.tick_params(axis="y", labelcolor="red")
+
+    # 添加标题和图例
+    plt.title("Loss of Each Epoch")
+    fig.legend(loc="upper right", bbox_to_anchor=(1, 1), bbox_transform=ax1.transAxes)
+
+    # 显示图表
+    plt.grid(True)
+    plt.show()
 
     return model
 
@@ -102,30 +132,52 @@ def test_classification(
     data_enrol, label_enrol = LoadDatasetObj.load_iq_samples(
         file_path_enrol, dev_range_enrol, pkt_range_enrol
     )
-    data_enrol = ChannelIndSpectrogramObj.channel_ind_spectrogram(data_enrol)
+    data_enrol = ChannelIndSpectrogramObj.channel_ind_spectrogram(data_enrol).squeeze(3)
+
+    # 准备三元组数据
+    triplet_data_enrol = [
+        data_enrol,
+        data_enrol,
+        data_enrol,
+    ]
+    triplet_label_enrol = [label_enrol, label_enrol, label_enrol]
+
+    # 将三元组输入转换为张量
+    triplet_data_enrol = [
+        torch.tensor(x).unsqueeze(1).float() for x in triplet_data_enrol
+    ]
 
     # 提取特征
     with torch.no_grad():
-        feature_enrol = (
-            model(torch.tensor(data_enrol).unsqueeze(1).float()).cpu().numpy()
-        )
+        feature_enrol = model(*triplet_data_enrol)
 
     # 使用 K-NN 分类器进行训练
     knnclf = KNeighborsClassifier(n_neighbors=15, metric="euclidean")
-    knnclf.fit(feature_enrol, label_enrol.ravel())
+    knnclf.fit(feature_enrol[0], label_enrol.ravel())
 
     # 加载分类数据集（IQ样本和标签）
     data_clf, true_label = LoadDatasetObj.load_iq_samples(
         file_path_clf, dev_range_clf, pkt_range_clf
     )
-    data_clf = ChannelIndSpectrogramObj.channel_ind_spectrogram(data_clf)
+    data_clf = ChannelIndSpectrogramObj.channel_ind_spectrogram(data_clf).squeeze(3)
+
+    # 准备三元组数据
+    triplet_data_clf = [
+        data_clf,
+        data_clf,
+        data_clf,
+    ]  # 这里简单地将数据复制为三元组形式
+    triplet_label_clf = [true_label, true_label, true_label]
+
+    # 将三元组输入转换为张量
+    triplet_data_clf = [torch.tensor(x).unsqueeze(1).float() for x in triplet_data_clf]
 
     # 提取分类数据集的特征
     with torch.no_grad():
-        feature_clf = model(torch.tensor(data_clf).unsqueeze(1).float()).cpu().numpy()
+        feature_clf = model(*triplet_data_clf)
 
     # 进行预测
-    pred_label = knnclf.predict(feature_clf)
+    pred_label = knnclf.predict(feature_clf[0])
     acc = accuracy_score(true_label, pred_label)
     print(f"Overall accuracy = {acc:.4f}")
 
@@ -172,16 +224,28 @@ def test_rogue_device_detection(
     data_enrol, label_enrol = LoadDatasetObj.load_iq_samples(
         file_path_enrol, dev_range_enrol, pkt_range_enrol
     )
-    data_enrol = ChannelIndSpectrogramObj.channel_ind_spectrogram(data_enrol)
+    data_enrol = ChannelIndSpectrogramObj.channel_ind_spectrogram(data_enrol).squeeze(3)
 
+    # 准备三元组数据
+    triplet_data_enrol = [
+        data_enrol,
+        data_enrol,
+        data_enrol,
+    ]
+    triplet_label_enrol = [label_enrol, label_enrol, label_enrol]
+
+    # 将三元组输入转换为张量
+    triplet_data_enrol = [
+        torch.tensor(x).unsqueeze(1).float() for x in triplet_data_enrol
+    ]
+
+    # 提取特征
     with torch.no_grad():
-        feature_enrol = (
-            model(torch.tensor(data_enrol).unsqueeze(1).float()).cpu().numpy()
-        )
+        feature_enrol = model(*triplet_data_enrol)
 
     # 构建 K-NN 分类器
     knnclf = KNeighborsClassifier(n_neighbors=15, metric="euclidean")
-    knnclf.fit(feature_enrol, label_enrol.ravel())
+    knnclf.fit(feature_enrol[0], label_enrol.ravel())
 
     # 加载合法设备和恶意设备数据
     data_legitimate, _ = LoadDatasetObj.load_iq_samples(
@@ -198,12 +262,27 @@ def test_rogue_device_detection(
     )
 
     # 提取特征
-    data_test = ChannelIndSpectrogramObj.channel_ind_spectrogram(data_test)
+    data_test = ChannelIndSpectrogramObj.channel_ind_spectrogram(data_test).squeeze(3)
+
+    # 准备三元组数据
+    triplet_data_test = [
+        data_test,
+        data_test,
+        data_test,
+    ]
+    triplet_label_test = [label_test, label_test, label_test]
+
+    # 将三元组输入转换为张量
+    triplet_data_test = [
+        torch.tensor(x).unsqueeze(1).float() for x in triplet_data_test
+    ]
+
+    # 提取特征
     with torch.no_grad():
-        feature_test = model(torch.tensor(data_test).unsqueeze(1).float()).cpu().numpy()
+        feature_test = model(*triplet_data_test)
 
     # 使用 K-NN 分类器进行预测
-    distances, _ = knnclf.kneighbors(feature_test)
+    distances, _ = knnclf.kneighbors(feature_test[0])
     detection_score = distances.mean(axis=1)
 
     # 计算 ROC 曲线和 AUC
@@ -228,7 +307,9 @@ def test_rogue_device_detection(
 # In[] 主程序执行逻辑
 if __name__ == "__main__":
     # 指定要运行的任务: "Train" / "Classification" / "Rogue Device Detection"
-    run_for = "Train"
+    mode_class = ["Train", "Classification", "Rogue Device Detection"]
+    mode_type = 1
+    run_for = mode_class[mode_type]
 
     if run_for == "Train":
         print("Train mode entering...")
@@ -262,7 +343,13 @@ if __name__ == "__main__":
                 labels = f["labels"][:]
 
         # 训练特征提取模型
-        feature_extractor = prepare_and_train(data, labels, dev_range)
+        feature_extractor = prepare_and_train(
+            data,
+            labels,
+            dev_range,
+            batch_size=32,
+            num_epochs=100,
+        )
 
         # 保存训练好的模型
         save_model(feature_extractor)
