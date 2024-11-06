@@ -22,6 +22,23 @@ class LoadDataset:
         )
         return data_complex
 
+    def _convert_to_complex_with_calibration(self, data):
+        """Convert the loaded data to complex IQ samples."""
+        num_row = data.shape[0]
+        num_col = data.shape[1]
+        data_complex = np.zeros([num_row, round(num_col / 2)], dtype=complex)
+
+        coeffs_a = np.arange(-0.05, 0.06, 0.01)
+        coeffs_a_r_I = np.random.choice(coeffs_a, round(num_col / 2))
+        coeffs_a_r_Q = np.random.choice(coeffs_a, round(num_col / 2))
+        coeffs_m_I = uniform(0.95, 1.05, round(num_col / 2))
+        coeffs_m_Q = uniform(0.95, 1.05, round(num_col / 2))
+
+        tt1 = data[:, : round(num_col / 2)] * coeffs_m_I + coeffs_a_r_I
+        tt2 = data[:, round(num_col / 2) :] * coeffs_m_Q + coeffs_a_r_Q
+        data_complex = tt1 + 1j * tt2
+        return data_complex
+
     def load_iq_samples(self, file_path, dev_range, pkt_range):
         """
         从数据集中加载IQ样本。
@@ -59,9 +76,56 @@ class LoadDataset:
 
         return data, label
 
+    def load_iq_samples_with_calibration(self, file_path, dev_range, pkt_range):
+        """
+        从数据集中加载IQ样本。
+
+        输入参数：
+            FILE_PATH 是数据集的路径。
+            DEV_RANGE 指定了要加载的设备范围。
+            PKT_RANGE 指定了要加载的数据包范围。
+
+        返回值：
+            DATA 是加载的复数IQ样本。
+            LABEL 是每个接收到的数据包的真实标签。
+        """
+        with h5py.File(file_path, "r") as f:
+            label = f[self.labelset_name][:]
+            label = label.astype(int).T - 1
+
+            label_start, label_end = int(label[0]) + 1, int(label[-1]) + 1
+            num_dev = label_end - label_start + 1
+            num_pkt = len(label)
+            num_pkt_per_dev = int(num_pkt / num_dev)
+
+            print(
+                f"Dataset information: Dev {label_start} to Dev {label_end}, {num_pkt_per_dev} packets per device."
+            )
+
+            sample_index_list = []
+            for dev_idx in dev_range:
+                sample_index_dev = np.where(label == dev_idx)[0][pkt_range].tolist()
+                sample_index_list.extend(sample_index_dev)
+
+            data = f[self.dataset_name][sample_index_list]
+            data = self._convert_to_complex_with_calibration(data)
+            label = label[sample_index_list]
+
+        return data, label
+
 
 # Additive White Gaussian Noise (AWGN) Function
 def awgn(data, snr_range):
+    """
+    向输入数据中的每个数据包添加加性高斯白噪声（AWGN）。
+
+    参数:
+    data (numpy.ndarray): 二维数组，其中每行代表一个数据包（复数信号）。
+    snr_range (tuple or list): 包含SNR范围（以dB为单位）的元组或列表。
+
+    返回:
+    numpy.ndarray: 包含添加了噪声的数据包的新数据数组。
+    """
     pkt_num = data.shape[0]
     SNRdB = uniform(snr_range[0], snr_range[-1], pkt_num)
     for pktIdx in range(pkt_num):

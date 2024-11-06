@@ -81,8 +81,7 @@ def prepare_and_train(
 
         end_time_ep = time.time()
 
-
-        loss_ep=total_loss/len(train_loader)*10
+        loss_ep = total_loss / len(train_loader) * 10
         print(
             f"Epoch [{epoch+1}/{num_epochs}],",
             f"time: {end_time_ep-start_time_ep:.2f}s,",
@@ -128,7 +127,19 @@ def test_classification(
     pkt_range_clf,
 ):
     """
-    使用特征提取模型进行分类测试，并返回分类准确率。
+    使用给定的特征提取模型对注册数据集和分类数据集进行分类测试，并返回分类预测标签、真实标签以及分类准确率。
+
+    参数:
+    model (torch.nn.Module): 用于特征提取的深度学习模型，该模型应接受三元组输入并返回特征。
+    file_path_enrol (str): 注册数据集的文件路径。
+    file_path_clf (str): 分类数据集的文件路径。
+    dev_range_enrol (tuple): 注册数据集中设备的范围（例如，设备ID的起始和结束值）。
+    pkt_range_enrol (tuple): 注册数据集中数据包的范围（例如，数据包的起始和结束索引）。
+    dev_range_clf (tuple): 分类数据集中设备的范围。
+    pkt_range_clf (tuple): 分类数据集中数据包的范围。
+
+    返回:
+    tuple: 包含三个元素的元组，分别是分类预测标签（numpy.ndarray）、真实标签（numpy.ndarray）以及分类准确率（float）。
     """
     # 加载数据
     LoadDatasetObj = LoadDataset()
@@ -191,7 +202,7 @@ def test_classification(
     conf_mat = confusion_matrix(true_label, pred_label)
     plt.figure()
     sns.heatmap(conf_mat, annot=True, fmt="d", cmap="Blues", cbar=False)
-    plt.title("Epoch 200")
+    plt.title("Test classification")
     plt.xlabel("Predicted label")
     plt.ylabel("True label")
     plt.show()
@@ -255,7 +266,7 @@ def test_rogue_device_detection(
     knnclf.fit(feature_enrol[0], label_enrol.ravel())
 
     # 加载合法设备和恶意设备数据
-    data_legitimate, _ = LoadDatasetObj.load_iq_samples(
+    data_legitimate, _ = LoadDatasetObj.load_iq_samples_with_calibration(
         file_path_legitimate, dev_range_legitimate, pkt_range_legitimate
     )
     data_rogue, _ = LoadDatasetObj.load_iq_samples(
@@ -362,7 +373,7 @@ if __name__ == "__main__":
         test_dev_range = np.arange(30, 40, dtype=int)
 
         # 执行分类任务
-        model = load_model("Extractor_200.pth")
+        model = load_model("Extractor.pth")
         pred_label, true_label, acc = test_classification(
             model,
             file_path_enrol="./dataset/Test/dataset_residential.h5",
@@ -377,7 +388,7 @@ if __name__ == "__main__":
         print("Rogue Device Detection mode entering...")
 
         # 执行恶意设备检测任务
-        model = load_model("Extractor_200.pth")
+        model = load_model("Extractor.pth")
         fpr, tpr, roc_auc, eer = test_rogue_device_detection(
             model,
             file_path_enrol="./dataset/Test/dataset_residential.h5",
