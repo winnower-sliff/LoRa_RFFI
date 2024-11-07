@@ -17,23 +17,34 @@ import torch.nn.functional as F
 https://github.com/AIFengheshu/Plug-play-modules
 """
 
+
 def create_wavelet_filter(wave, in_size, out_size, type=torch.float):
     w = pywt.Wavelet(wave)
     dec_hi = torch.tensor(w.dec_hi[::-1], dtype=type)
     dec_lo = torch.tensor(w.dec_lo[::-1], dtype=type)
-    dec_filters = torch.stack([dec_lo.unsqueeze(0) * dec_lo.unsqueeze(1),
-                               dec_lo.unsqueeze(0) * dec_hi.unsqueeze(1),
-                               dec_hi.unsqueeze(0) * dec_lo.unsqueeze(1),
-                               dec_hi.unsqueeze(0) * dec_hi.unsqueeze(1)], dim=0)
+    dec_filters = torch.stack(
+        [
+            dec_lo.unsqueeze(0) * dec_lo.unsqueeze(1),
+            dec_lo.unsqueeze(0) * dec_hi.unsqueeze(1),
+            dec_hi.unsqueeze(0) * dec_lo.unsqueeze(1),
+            dec_hi.unsqueeze(0) * dec_hi.unsqueeze(1),
+        ],
+        dim=0,
+    )
 
     dec_filters = dec_filters[:, None].repeat(in_size, 1, 1, 1)
 
     rec_hi = torch.tensor(w.rec_hi[::-1], dtype=type).flip(dims=[0])
     rec_lo = torch.tensor(w.rec_lo[::-1], dtype=type).flip(dims=[0])
-    rec_filters = torch.stack([rec_lo.unsqueeze(0) * rec_lo.unsqueeze(1),
-                               rec_lo.unsqueeze(0) * rec_hi.unsqueeze(1),
-                               rec_hi.unsqueeze(0) * rec_lo.unsqueeze(1),
-                               rec_hi.unsqueeze(0) * rec_hi.unsqueeze(1)], dim=0)
+    rec_filters = torch.stack(
+        [
+            rec_lo.unsqueeze(0) * rec_lo.unsqueeze(1),
+            rec_lo.unsqueeze(0) * rec_hi.unsqueeze(1),
+            rec_hi.unsqueeze(0) * rec_lo.unsqueeze(1),
+            rec_hi.unsqueeze(0) * rec_hi.unsqueeze(1),
+        ],
+        dim=0,
+    )
 
     rec_filters = rec_filters[:, None].repeat(out_size, 1, 1, 1)
 
@@ -57,9 +68,18 @@ def inverse_wavelet_transform(x, filters):
 
 
 # Wavelet Transform Conv(WTConv2d)
-class WTConv2d(nn.Module):
-    def __init__(self, in_channels, out_channels, kernel_size=5, stride=1, bias=True, wt_levels=1, wt_type='db1'):
-        super(WTConv2d, self).__init__()
+class _WTConv2d(nn.Module):
+    def __init__(
+        self,
+        in_channels,
+        out_channels,
+        kernel_size=5,
+        stride=1,
+        bias=True,
+        wt_levels=1,
+        wt_type="db1",
+    ):
+        super(_WTConv2d, self).__init__()
 
         assert in_channels == out_channels
 
@@ -68,29 +88,60 @@ class WTConv2d(nn.Module):
         self.stride = stride
         self.dilation = 1
 
-        self.wt_filter, self.iwt_filter = create_wavelet_filter(wt_type, in_channels, in_channels, torch.float)
+        self.wt_filter, self.iwt_filter = create_wavelet_filter(
+            wt_type, in_channels, in_channels, torch.float
+        )
         self.wt_filter = nn.Parameter(self.wt_filter, requires_grad=False)
         self.iwt_filter = nn.Parameter(self.iwt_filter, requires_grad=False)
 
         self.wt_function = partial(wavelet_transform, filters=self.wt_filter)
         self.iwt_function = partial(inverse_wavelet_transform, filters=self.iwt_filter)
 
-        self.base_conv = nn.Conv2d(in_channels, in_channels, kernel_size, padding='same', stride=1, dilation=1,
-                                   groups=in_channels, bias=bias)
+        self.base_conv = nn.Conv2d(
+            in_channels,
+            in_channels,
+            kernel_size,
+            padding="same",
+            stride=1,
+            dilation=1,
+            groups=in_channels,
+            bias=bias,
+        )
         self.base_scale = _ScaleModule([1, in_channels, 1, 1])
 
         self.wavelet_convs = nn.ModuleList(
-            [nn.Conv2d(in_channels * 4, in_channels * 4, kernel_size, padding='same', stride=1, dilation=1,
-                       groups=in_channels * 4, bias=False) for _ in range(self.wt_levels)]
+            [
+                nn.Conv2d(
+                    in_channels * 4,
+                    in_channels * 4,
+                    kernel_size,
+                    padding="same",
+                    stride=1,
+                    dilation=1,
+                    groups=in_channels * 4,
+                    bias=False,
+                )
+                for _ in range(self.wt_levels)
+            ]
         )
         self.wavelet_scale = nn.ModuleList(
-            [_ScaleModule([1, in_channels * 4, 1, 1], init_scale=0.1) for _ in range(self.wt_levels)]
+            [
+                _ScaleModule([1, in_channels * 4, 1, 1], init_scale=0.1)
+                for _ in range(self.wt_levels)
+            ]
         )
 
         if self.stride > 1:
-            self.stride_filter = nn.Parameter(torch.ones(in_channels, 1, 1, 1), requires_grad=False)
-            self.do_stride = lambda x_in: F.conv2d(x_in, self.stride_filter, bias=None, stride=self.stride,
-                                                   groups=in_channels)
+            self.stride_filter = nn.Parameter(
+                torch.ones(in_channels, 1, 1, 1), requires_grad=False
+            )
+            self.do_stride = lambda x_in: F.conv2d(
+                x_in,
+                self.stride_filter,
+                bias=None,
+                stride=self.stride,
+                groups=in_channels,
+            )
         else:
             self.do_stride = None
 
@@ -113,7 +164,9 @@ class WTConv2d(nn.Module):
             curr_x_ll = curr_x[:, :, 0, :, :]
 
             shape_x = curr_x.shape
-            curr_x_tag = curr_x.reshape(shape_x[0], shape_x[1] * 4, shape_x[3], shape_x[4])
+            curr_x_tag = curr_x.reshape(
+                shape_x[0], shape_x[1] * 4, shape_x[3], shape_x[4]
+            )
             curr_x_tag = self.wavelet_scale[i](self.wavelet_convs[i](curr_x_tag))
             curr_x_tag = curr_x_tag.reshape(shape_x)
 
@@ -132,7 +185,7 @@ class WTConv2d(nn.Module):
             curr_x = torch.cat([curr_x_ll.unsqueeze(2), curr_x_h], dim=2)
             next_x_ll = self.iwt_function(curr_x)
 
-            next_x_ll = next_x_ll[:, :, :curr_shape[2], :curr_shape[3]]
+            next_x_ll = next_x_ll[:, :, : curr_shape[2], : curr_shape[3]]
 
         x_tag = next_x_ll
         assert len(x_ll_in_levels) == 0
@@ -162,10 +215,20 @@ class DepthwiseSeparableConvWithWTConv2d(nn.Module):
         super(DepthwiseSeparableConvWithWTConv2d, self).__init__()
 
         # 深度卷积：使用 WTConv2d 替换 3x3 卷积
-        self.depthwise = WTConv2d(in_channels, in_channels, kernel_size=kernel_size)
+        self.depthwise = _WTConv2d(
+            in_channels,
+            in_channels,
+            kernel_size=kernel_size,
+            stride=1,
+            bias=True,
+            wt_levels=1,
+            wt_type="db1",
+        )
 
         # 逐点卷积：使用 1x1 卷积
-        self.pointwise = nn.Conv2d(in_channels, out_channels, kernel_size=1, stride=1, padding=0, bias=False)
+        self.pointwise = nn.Conv2d(
+            in_channels, out_channels, kernel_size=1, stride=1, padding=0, bias=False
+        )
 
     def forward(self, x):
         x = self.depthwise(x)
@@ -173,9 +236,8 @@ class DepthwiseSeparableConvWithWTConv2d(nn.Module):
         return x
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     input = torch.randn(3, 32, 64, 64)  # b c h w输入
     wtconv = DepthwiseSeparableConvWithWTConv2d(in_channels=32, out_channels=32)
     output = wtconv(input)
     print(output.size())
-
