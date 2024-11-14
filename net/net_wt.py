@@ -5,7 +5,10 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import Dataset
 
-from WTConv import WTConv2d
+from WTConv import DepthwiseSeparableConvWithWTConv2d
+
+NET_TYPE = "net_wt_1"
+
 
 # 自定义Dataset类，用于三元组生成
 # 更新后的 TripletDataset 类
@@ -81,7 +84,8 @@ class ResBlock(nn.Module):
 class FeatureExtractor(nn.Module):
     def __init__(self):
         super(FeatureExtractor, self).__init__()
-        self.conv1 = nn.Conv2d(1, 32, kernel_size=7, stride=2, padding=3)
+        self.WtConv1 = DepthwiseSeparableConvWithWTConv2d(1, 32)
+        self.conv1 = nn.Conv2d(32, 32, kernel_size=7, stride=2, padding=3)
         self.layer1 = ResBlock(32, 32)
         self.layer2 = ResBlock(32, 32)
         self.layer3 = ResBlock(32, 64, first_layer=True)
@@ -91,6 +95,7 @@ class FeatureExtractor(nn.Module):
         self.fc = nn.Linear(64, 512)
 
     def forward(self, x):
+        x = F.relu(self.WtConv1(x))
         x = F.relu(self.conv1(x))
         x = self.layer1(x)
         x = self.layer2(x)
