@@ -1,9 +1,12 @@
-import h5py
-
+from matplotlib import pyplot as plt
+import numpy as np
 from numpy import sum, sqrt
 from numpy.random import standard_normal, uniform
+
 import scipy.signal as signal
-import numpy as np
+import h5py
+from kymatio import Scattering1D
+from tqdm import tqdm
 
 
 # Dataset loader class for IQ samples
@@ -216,12 +219,64 @@ class ChannelIndSpectrogram:
         num_sample = data.shape[0]
         num_row = int(256 * 0.4)
         num_column = int(np.floor((data.shape[1] - 256) / 128 + 1) - 1)
-        data_channel_ind_spec = np.zeros([num_sample, num_row, num_column, 1])
+        data_channel_ind_spec = np.zeros([num_sample, 1, num_row, num_column])
 
         # Convert each packet (IQ samples) to a channel independent spectrogram.
-        for i in range(num_sample):
+        for i in tqdm(range(num_sample)):
             chan_ind_spec_amp = self._gen_single_channel_ind_spectrogram(data[i])
             chan_ind_spec_amp = self._spec_crop(chan_ind_spec_amp)
-            data_channel_ind_spec[i, :, :, 0] = chan_ind_spec_amp
+            data_channel_ind_spec[i, 0, :, :] = chan_ind_spec_amp
 
         return data_channel_ind_spec
+
+    def wavelet_scattering(self, data, J=6, Q=6):
+        """
+        将批量IQ样本转换为小波散射特征图。
+
+        参数:
+        data (ndarray): 输入的IQ样本数据，其中每一行代表一个IQ样本。
+        J (int, 可选): 小波散射的尺度，默认为6。
+        Q (int, 可选): 每倍频程的滤波器数量，默认为8。
+
+        返回:
+        ndarray: 一个三维数组，包含所有IQ样本对应的小波散射特征图。
+                形状为 (样本数量, 时间点数, 特征数)。
+        """
+        num_sample, sample_length = data.shape
+
+        # 初始化小波散射
+        scattering = Scattering1D(J=J, Q=Q, shape=(sample_length,))
+
+        # 计算小波散射输出形状
+        scatter_example = scattering(np.real(data[0]))  # 使用第一个样本计算输出
+        num_row, num_column = scatter_example.shape  # 确定时间点数和特征数
+
+        # 初始化存储矩阵
+        data_wav_spec = np.zeros(
+            (num_sample, 2, round(0.3 * num_row) - 1, num_column - 1)
+        )
+
+        for i in tqdm(range(num_sample)):
+            sig = np.asarray(data[i])  # 当前样本信号
+
+            # 分离复数信号的实部和虚部
+            real_part = np.real(sig)
+            imag_part = np.imag(sig)
+
+            # 分别计算实部和虚部的小波散射
+            scatter_real = scattering(real_part)
+            scatter_imag = scattering(imag_part)
+
+            # 将实部和虚部结果组合（例如计算幅度）
+            scatter_combined = np.stack((scatter_real, scatter_imag), axis=0)
+            scatter_combined = scatter_combined[
+                :, round(0.1 * num_row) : round(0.4 * num_row)
+            ]
+            # Generate channel independent spectrogram.
+            scatter_combined = scatter_combined[:, :, 1:] / scatter_combined[:, :, :-1]
+            scatter_combined = np.log10(np.abs(scatter_combined) ** 2)
+
+            # 存储结果
+            data_wav_spec[i] = scatter_combined
+
+        return data_wav_spec

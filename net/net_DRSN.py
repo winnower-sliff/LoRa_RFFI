@@ -14,7 +14,7 @@ import torch.nn.functional as F
 from torch.utils.data import Dataset
 
 
-NET_TYPE = "net_drsn"
+NET_TYPE = "drsn"
 
 
 # 自定义Dataset类，用于三元组生成
@@ -47,9 +47,9 @@ class TripletDataset(Dataset):
 
         # 返回 anchor, positive, negative 样本
         return (
-            torch.tensor(anchor, dtype=torch.float32).unsqueeze(0),
-            torch.tensor(positive, dtype=torch.float32).unsqueeze(0),
-            torch.tensor(negative, dtype=torch.float32).unsqueeze(0),
+            torch.tensor(anchor, dtype=torch.float32),
+            torch.tensor(positive, dtype=torch.float32),
+            torch.tensor(negative, dtype=torch.float32),
         )
 
 
@@ -107,9 +107,9 @@ class BasicBlock(nn.Module):
             nn.Conv2d(
                 in_channels,
                 out_channels,
-                kernel_size=(1, 3),  # 卷积核大小
+                kernel_size=(3, 3),  # 卷积核大小
                 stride=stride,  # 步长
-                padding=(0, 1),  # 填充
+                padding=(1, 1),  # 填充
                 bias=False,  # 是否使用偏置项
             ),
             nn.BatchNorm2d(out_channels),  # 批量归一化层
@@ -117,8 +117,8 @@ class BasicBlock(nn.Module):
             nn.Conv2d(
                 out_channels,
                 out_channels * BasicBlock.expansion,  # 输出通道数乘以扩张比例
-                kernel_size=(1, 3),
-                padding=(0, 1),
+                kernel_size=(3, 3),
+                padding=(1, 1),
                 bias=False,
             ),
             nn.BatchNorm2d(out_channels * BasicBlock.expansion),
@@ -233,10 +233,10 @@ def _rsnet34(in_channels):
 
 # TripletNet类，用于创建三元组网络
 class TripletNet(nn.Module):
-    def __init__(self, margin=0.1):
+    def __init__(self, in_channels=2, margin=0.1):
         super(TripletNet, self).__init__()
         self.margin = margin
-        self.embedding_net = _rsnet18(in_channels=1)
+        self.embedding_net = _rsnet18(in_channels=in_channels)
 
     def forward(self, anchor, positive, negative):
         embedded_anchor = self.embedding_net(anchor)

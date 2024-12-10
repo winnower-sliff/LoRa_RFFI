@@ -5,7 +5,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import Dataset
 
-NET_TYPE = "net_original"
+NET_TYPE = "origin"
 
 
 # 自定义Dataset类，用于三元组生成
@@ -38,9 +38,9 @@ class TripletDataset(Dataset):
 
         # 返回 anchor, positive, negative 样本
         return (
-            torch.tensor(anchor, dtype=torch.float32).unsqueeze(0),
-            torch.tensor(positive, dtype=torch.float32).unsqueeze(0),
-            torch.tensor(negative, dtype=torch.float32).unsqueeze(0),
+            torch.tensor(anchor, dtype=torch.float32),
+            torch.tensor(positive, dtype=torch.float32),
+            torch.tensor(negative, dtype=torch.float32),
         )
 
 
@@ -80,9 +80,9 @@ class ResBlock(nn.Module):
 
 # 特征提取模型
 class FeatureExtractor(nn.Module):
-    def __init__(self):
+    def __init__(self, in_channels):
         super(FeatureExtractor, self).__init__()
-        self.conv1 = nn.Conv2d(1, 32, kernel_size=7, stride=2, padding=3)
+        self.conv1 = nn.Conv2d(in_channels, 32, kernel_size=7, stride=2, padding=3)
         self.layer1 = ResBlock(32, 32)
         self.layer2 = ResBlock(32, 32)
         self.layer3 = ResBlock(32, 64, first_layer=True)
@@ -105,10 +105,10 @@ class FeatureExtractor(nn.Module):
 
 # TripletNet类，用于创建三元组网络
 class TripletNet(nn.Module):
-    def __init__(self, margin=0.1):
+    def __init__(self, in_channels=1, margin=0.1):
         super(TripletNet, self).__init__()
         self.margin = margin
-        self.embedding_net = FeatureExtractor()
+        self.embedding_net = FeatureExtractor(in_channels=in_channels)
 
     def forward(self, anchor, positive, negative):
         embedded_anchor = self.embedding_net(anchor)
