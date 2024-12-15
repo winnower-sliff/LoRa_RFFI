@@ -233,7 +233,7 @@ def _rsnet34(in_channels):
 
 # TripletNet类，用于创建三元组网络
 class TripletNet(nn.Module):
-    def __init__(self, in_channels=2, margin=0.1):
+    def __init__(self, in_channels, margin=0.1):
         super(TripletNet, self).__init__()
         self.margin = margin
         self.embedding_net = _rsnet18(in_channels=in_channels)

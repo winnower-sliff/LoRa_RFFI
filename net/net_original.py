@@ -105,7 +105,7 @@ class FeatureExtractor(nn.Module):
 
 # TripletNet类，用于创建三元组网络
 class TripletNet(nn.Module):
-    def __init__(self, in_channels=1, margin=0.1):
+    def __init__(self, in_channels, margin=0.1):
         super(TripletNet, self).__init__()
         self.margin = margin
         self.embedding_net = FeatureExtractor(in_channels=in_channels)

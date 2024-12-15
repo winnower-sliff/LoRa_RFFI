@@ -1,3 +1,4 @@
+from math import ceil, floor
 from matplotlib import pyplot as plt
 import numpy as np
 from numpy import sum, sqrt
@@ -252,9 +253,7 @@ class ChannelIndSpectrogram:
         num_row, num_column = scatter_example.shape  # 确定时间点数和特征数
 
         # 初始化存储矩阵
-        data_wav_spec = np.zeros(
-            (num_sample, 2, round(0.3 * num_row) - 1, num_column - 1)
-        )
+        data_wav_spec = np.zeros((num_sample, 2, ceil(0.4 * num_row), num_column - 1))
 
         for i in tqdm(range(num_sample)):
             sig = np.asarray(data[i])  # 当前样本信号
@@ -270,13 +269,24 @@ class ChannelIndSpectrogram:
             # 将实部和虚部结果组合（例如计算幅度）
             scatter_combined = np.stack((scatter_real, scatter_imag), axis=0)
             scatter_combined = scatter_combined[
-                :, round(0.1 * num_row) : round(0.4 * num_row)
+                :, floor(0.2 * num_row) : floor(0.6 * num_row)
             ]
             # Generate channel independent spectrogram.
             scatter_combined = scatter_combined[:, :, 1:] / scatter_combined[:, :, :-1]
             scatter_combined = np.log10(np.abs(scatter_combined) ** 2)
 
+            """绘制结果，不要删除！！！"""
+            # for i in range(2):
+            #     plt.imshow(
+            #         scatter_combined[i], aspect="auto", cmap="viridis", origin="lower"
+            #     )
+            #     plt.title("Wavelet Scattering Coefficients")
+            #     plt.xlabel("Time")
+            #     plt.ylabel("Scattering Coefficients")
+            #     plt.colorbar(label="Amplitude")
+            #     plt.show()
+            #     print(1)
+
             # 存储结果
             data_wav_spec[i] = scatter_combined
-
         return data_wav_spec

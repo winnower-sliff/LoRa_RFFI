@@ -18,35 +18,50 @@ from tqdm import tqdm
 
 from signal_trans import *
 
+""" 基础设置 """
+
+# 不要 net_0 & pps_1
 # 0 for origin, 1 for drsn
 net_type = 1
 # 0 for stft, 1 for wst
 PROPRECESS_TYPE = 1
 # "Train" / "Classification" / "Rogue Device Detection"
 mode_type = 0
+# 我们需要一个新的训练文件吗？
+NEW_FILE_FLAG = 1
 
-mode_class = ["Train", "Classification", "Rogue Device Detection"]
-RUN_FOR = mode_class[int(mode_type)]
+TEST_LIST = [1, 5, 10, 20, 50, 100, 150, 200, 250, 300]
+# TEST_LIST = [1]
+
 
 if net_type == 0:
     from net.net_original import *
 elif net_type == 1:
     from net.net_DRSN import *
+if PROPRECESS_TYPE == 0:
+    PPS_FOR = "stft"
+    MODEL_DIR_PATH = f"./model/{PPS_FOR}/{NET_TYPE}/"
+else:
+    PPS_FOR = "wst"
+    WST_J = 4
+    WST_Q = 6
+    MODEL_DIR_PATH = f"./model/{PPS_FOR}_j{WST_J}q{WST_Q}/{NET_TYPE}/"
 
-PPS_FOR = "stft" if PROPRECESS_TYPE == 0 else "wst"
-WST_Q = 8
+if not os.path.exists(MODEL_DIR_PATH):
+    os.makedirs(MODEL_DIR_PATH)
 
-TEST_LIST = [1, 5, 10, 20, 50, 100, 150, 200, 250, 300]
-# TEST_LIST = [1]
+mode_class = ["Train", "Classification", "Rogue Device Detection"]
+RUN_FOR = mode_class[int(mode_type)]
 
-DIR_NAME = f"./model/{PPS_FOR}/{NET_TYPE}/"
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
 # 模型加载函数
-def load_model(file_path=f"./model/{NET_TYPE}/Extractor.pth", weights_only=True):
+def load_model(
+    file_path=f"./model/{NET_TYPE}/Extractor_{max(TEST_LIST)}.pth", weights_only=True
+):
     """从指定路径加载模型"""
-    model = TripletNet()
+    model = TripletNet(in_channels=1 if PROPRECESS_TYPE == 0 else 2)
     model.load_state_dict(torch.load(file_path, weights_only=weights_only))
     model.eval()
     print(f"Model loaded from {file_path}")
@@ -60,7 +75,7 @@ def proPrecessData(data, ChannelIndSpectrogramObj: ChannelIndSpectrogram):
     if PROPRECESS_TYPE == 0:
         data = ChannelIndSpectrogramObj.channel_ind_spectrogram(data)
     if PROPRECESS_TYPE == 1:
-        data = ChannelIndSpectrogramObj.wavelet_scattering(data, Q=WST_Q)
+        data = ChannelIndSpectrogramObj.wavelet_scattering(data, J=WST_J, Q=WST_Q)
     return data
 
 
@@ -193,42 +208,46 @@ def prepare_and_train(
                 # print(f"Extractor {epoch+1} saving...")
                 # save_model(model=model, file_path=f"./model/wt_1/Extractor_{epoch+1}.pth")
 
-                if not os.path.exists(DIR_NAME):
-                    os.makedirs(DIR_NAME)
+                if not os.path.exists(MODEL_DIR_PATH):
+                    os.makedirs(MODEL_DIR_PATH)
                 fileName = f"Extractor_{epoch + 1}.pth"
                 """保存模型到指定路径"""
-                file_path = DIR_NAME + fileName
+                file_path = MODEL_DIR_PATH + fileName
                 torch.save(model.state_dict(), file_path)
                 tqdm.write(f"Model saved to {file_path}")
 
+                if (epoch + 1) in TEST_LIST[-3:]:
+                    print("Plotting results... ")
+                    fig, ax1 = plt.subplots()
+                    ax1.plot(
+                        range(len(loss_perepoch)),
+                        loss_perepoch,
+                        label="Loss",
+                        color="red",
+                    )
+                    ax1.set_xlabel("Epoch")
+                    ax1.set_ylabel("Loss", color="red")
+                    ax1.tick_params(axis="y", labelcolor="red")
+
+                    # 添加标题和图例
+                    plt.title(
+                        f"Loss of {num_epochs} Epoch, Net: {NET_TYPE}, Convert Type: {PROPRECESS_TYPE}"
+                    )
+                    fig.legend(
+                        loc="upper right",
+                        bbox_to_anchor=(1, 1),
+                        bbox_transform=ax1.transAxes,
+                    )
+
+                    # 显示图表
+                    plt.grid(True)
+
+                    pic_save_path = MODEL_DIR_PATH + f"loss_{epoch+1}.png"
+                    plt.savefig(pic_save_path)
+                    # plt.show()
+
             # 更新总进度条
             total_bar.update(1)
-
-    print("Plotting results... ")
-    fig, ax1 = plt.subplots()
-    ax1.plot(
-        range(len(loss_perepoch)),
-        loss_perepoch,
-        label="Loss",
-        color="red",
-    )
-    ax1.set_xlabel("Epoch")
-    ax1.set_ylabel("Loss", color="red")
-    ax1.tick_params(axis="y", labelcolor="red")
-
-    # 添加标题和图例
-    plt.title(
-        f"Loss of {num_epochs} Epoch, Net: {NET_TYPE}, Convert Type: {PROPRECESS_TYPE}"
-    )
-    fig.legend(loc="upper right", bbox_to_anchor=(1, 1), bbox_transform=ax1.transAxes)
-
-    # 显示图表
-    plt.grid(True)
-
-    pic_save_path = DIR_NAME + "loss.png"
-    plt.savefig(pic_save_path)
-    plt.show()
-
     return
 
 
@@ -291,137 +310,146 @@ def test_classification(
 
     for epoch in TEST_LIST:
         print()
+        model = MODEL_DIR_PATH + f"Extractor_{epoch}.pth"
+        if os.path.exists(model):
+            model = load_model(model)
 
-        model = load_model(DIR_NAME + f"Extractor_{epoch}.pth")
+            # 提取特征
+            print("Feature extracting...")
+            with torch.no_grad():
+                feature_enrol = model(*triplet_data_enrol)
 
-        # 提取特征
-        print("Feature extracting...")
-        with torch.no_grad():
-            feature_enrol = model(*triplet_data_enrol)
+            # 使用 K-NN 分类器进行训练
+            knnclf = KNeighborsClassifier(n_neighbors=100, metric="euclidean")
+            knnclf.fit(feature_enrol[0], label_enrol.ravel())
 
-        # 使用 K-NN 分类器进行训练
-        knnclf = KNeighborsClassifier(n_neighbors=100, metric="euclidean")
-        knnclf.fit(feature_enrol[0], label_enrol.ravel())
+            svmclf = SVC(kernel="rbf", C=1.0)  # 可以根据需要调整参数
+            svmclf.fit(feature_enrol[0], label_enrol.ravel())
 
-        svmclf = SVC(kernel="rbf", C=1.0)  # 可以根据需要调整参数
-        svmclf.fit(feature_enrol[0], label_enrol.ravel())
+            """
+            进行预测
+            """
 
-        """
-        进行预测
-        """
+            print("Device predicting...")
+            clf_start_time = time.time()
+            # dev_range_clf = dev_range_clf[dev_range_clf != 39]
 
-        print("Device predicting...")
-        clf_start_time = time.time()
-        # dev_range_clf = dev_range_clf[dev_range_clf != 39]
+            # 提取分类数据集的特征
+            with torch.no_grad():
+                feature_clf = model(*triplet_data_clf)
 
-        # 提取分类数据集的特征
-        with torch.no_grad():
-            feature_clf = model(*triplet_data_clf)
+            # K-NN和SVM的初步预测
+            pred_label_knn_wo = knnclf.predict(feature_clf[0])
+            pred_label_svm_wo = svmclf.predict(feature_clf[0])
 
-        # K-NN和SVM的初步预测
-        pred_label_knn_wo = knnclf.predict(feature_clf[0])
-        pred_label_svm_wo = svmclf.predict(feature_clf[0])
+            # K-NN投票机制
+            pred_label_knn_w_v = []
+            for i in range(len(pred_label_knn_wo)):
+                window_start = max(0, i - vote_size // 2)
+                window_end = min(len(pred_label_knn_wo), i + vote_size // 2 + 1)
+                window_knn = pred_label_knn_wo[window_start:window_end]
+                most_common_label_knn = Counter(window_knn).most_common(1)[0][0]
+                pred_label_knn_w_v.append(most_common_label_knn)
 
-        # K-NN投票机制
-        pred_label_knn_w_v = []
-        for i in range(len(pred_label_knn_wo)):
-            window_start = max(0, i - vote_size // 2)
-            window_end = min(len(pred_label_knn_wo), i + vote_size // 2 + 1)
-            window_knn = pred_label_knn_wo[window_start:window_end]
-            most_common_label_knn = Counter(window_knn).most_common(1)[0][0]
-            pred_label_knn_w_v.append(most_common_label_knn)
+            # SVM投票机制
+            pred_label_svm_w_v = []
+            for i in range(len(pred_label_svm_wo)):
+                window_start = max(0, i - vote_size // 2)
+                window_end = min(len(pred_label_svm_wo), i + vote_size // 2 + 1)
+                window_svm = pred_label_svm_wo[window_start:window_end]
+                most_common_label_svm = Counter(window_svm).most_common(1)[0][0]
+                pred_label_svm_w_v.append(most_common_label_svm)
 
-        # SVM投票机制
-        pred_label_svm_w_v = []
-        for i in range(len(pred_label_svm_wo)):
-            window_start = max(0, i - vote_size // 2)
-            window_end = min(len(pred_label_svm_wo), i + vote_size // 2 + 1)
-            window_svm = pred_label_svm_wo[window_start:window_end]
-            most_common_label_svm = Counter(window_svm).most_common(1)[0][0]
-            pred_label_svm_w_v.append(most_common_label_svm)
+            # 综合投票机制
+            combined_label = []
+            for i in range(0, len(pred_label_knn_w_v), vote_size):
+                window_end = min(i + vote_size, len(pred_label_knn_w_v))
 
-        # 综合投票机制
-        combined_label = []
-        for i in range(0, len(pred_label_knn_w_v), vote_size):
-            window_end = min(i + vote_size, len(pred_label_knn_w_v))
+                knn_votes = Counter()
+                svm_votes = Counter()
 
-            knn_votes = Counter()
-            svm_votes = Counter()
+                for j in range(i, window_end):
+                    knn_votes[pred_label_knn_w_v[j]] += weight_knn
+                    svm_votes[pred_label_svm_w_v[j]] += weight_svm
+                combined_votes = knn_votes + svm_votes
+                final_label = combined_votes.most_common(1)[0][0]
 
-            for j in range(i, window_end):
-                knn_votes[pred_label_knn_w_v[j]] += weight_knn
-                svm_votes[pred_label_svm_w_v[j]] += weight_svm
-            combined_votes = knn_votes + svm_votes
-            final_label = combined_votes.most_common(1)[0][0]
+                # 保持与原样本相同的长度
+                combined_label.extend([final_label] * (window_end - i))
 
-            # 保持与原样本相同的长度
-            combined_label.extend([final_label] * (window_end - i))
+            # 计算各分类器的准确率
+            wo_acc_knn = accuracy_score(label_clf, pred_label_knn_wo)
+            wo_acc_svm = accuracy_score(label_clf, pred_label_svm_wo)
+            w_acc_knn = accuracy_score(label_clf, pred_label_knn_w_v)
+            w_acc_svm = accuracy_score(label_clf, pred_label_svm_w_v)
+            acc_combined = accuracy_score(label_clf, combined_label)
+            wo_accs = [wo_acc_knn, wo_acc_svm]
+            w_accs = [w_acc_knn, w_acc_svm, acc_combined]
+            wwo_accs = [wo_accs, w_accs]
 
-        # 计算各分类器的准确率
-        wo_acc_knn = accuracy_score(label_clf, pred_label_knn_wo)
-        wo_acc_svm = accuracy_score(label_clf, pred_label_svm_wo)
-        w_acc_knn = accuracy_score(label_clf, pred_label_knn_w_v)
-        w_acc_svm = accuracy_score(label_clf, pred_label_svm_w_v)
-        acc_combined = accuracy_score(label_clf, combined_label)
-        wo_accs = [wo_acc_knn, wo_acc_svm]
-        w_accs = [w_acc_knn, w_acc_svm, acc_combined]
-        wwo_accs = [wo_accs, w_accs]
+            timeCost = time.time() - clf_start_time
 
-        timeCost = time.time() - clf_start_time
+            print("-----------------------------")
+            print(f"Extractor ID: {epoch}")
+            print(f"Vote Size: {vote_size}")
+            print(
+                f"KNN accuracy\t\tw/o\tvoting = {wo_acc_knn * 100:.2f}%\n"
+                f"SVM accuracy\t\tw/o\tvoting = {wo_acc_svm * 100:.2f}%\n"
+                f"KNN accuracy\t\tw/\tvoting = {w_acc_knn * 100:.2f}%\n"
+                f"SVM accuracy\t\tw/\tvoting = {w_acc_svm * 100:.2f}%\n"
+                f"Combined accuracy\tw/\tweighted voting = {acc_combined * 100:.2f}%",
+            )
+            print(f"Time cost: {timeCost:.3f}s")
+            print("-----------------------------")
+            print()
 
-        print("-----------------------------")
-        print(f"Extractor ID: {epoch}")
-        print(f"Vote Size: {vote_size}")
-        print(
-            f"KNN accuracy\t\tw/o\tvoting = {wo_acc_knn * 100:.2f}%\n"
-            f"SVM accuracy\t\tw/o\tvoting = {wo_acc_svm * 100:.2f}%\n"
-            f"KNN accuracy\t\tw/\tvoting = {w_acc_knn * 100:.2f}%\n"
-            f"SVM accuracy\t\tw/\tvoting = {w_acc_svm * 100:.2f}%\n"
-            f"Combined accuracy\tw/\tweighted voting = {acc_combined * 100:.2f}%",
-        )
-        print(f"Time cost: {timeCost:.3f}s")
-        print("-----------------------------")
-        print()
+            # 绘制混淆矩阵
+            conf_mat_knn_wo = confusion_matrix(label_clf, pred_label_knn_w_v)
+            conf_mat_svm_wo = confusion_matrix(label_clf, pred_label_svm_w_v)
+            conf_mat_knn_w = confusion_matrix(label_clf, pred_label_knn_w_v)
+            conf_mat_svm_w = confusion_matrix(label_clf, pred_label_svm_w_v)
+            conf_mat_combined = confusion_matrix(label_clf, combined_label)
+            wo_cms = [conf_mat_knn_wo, conf_mat_svm_wo]
+            w_cms = [conf_mat_knn_w, conf_mat_svm_w, conf_mat_combined]
+            wwo_cms = [wo_cms, w_cms]
 
-        # 绘制混淆矩阵
-        conf_mat_knn_wo = confusion_matrix(label_clf, pred_label_knn_w_v)
-        conf_mat_svm_wo = confusion_matrix(label_clf, pred_label_svm_w_v)
-        conf_mat_knn_w = confusion_matrix(label_clf, pred_label_knn_w_v)
-        conf_mat_svm_w = confusion_matrix(label_clf, pred_label_svm_w_v)
-        conf_mat_combined = confusion_matrix(label_clf, combined_label)
-        wo_cms = [conf_mat_knn_wo, conf_mat_svm_wo]
-        w_cms = [conf_mat_knn_w, conf_mat_svm_w, conf_mat_combined]
-        wwo_cms = [wo_cms, w_cms]
+            fig, axs = plt.subplots(2, 3, figsize=(20, 12))
+            types = ["KNN", "SVM", "Combined"]
+            wwo = ["w/o", "w/"]
 
-        fig, axs = plt.subplots(2, 3, figsize=(20, 12))
-        types = ["KNN", "SVM", "Combined"]
-        wwo = ["w/o", "w/"]
+            for i in range(2):
+                for j in range(2 if i == 0 else 3):
+                    sns.heatmap(
+                        wwo_cms[i][j],
+                        annot=True,
+                        fmt="d",
+                        cmap="Blues",
+                        cbar=False,
+                        square=True,
+                        ax=axs[i][j],
+                    )
+                    axs[i][j].set_title(
+                        f"{types[j]} {wwo[i]} Vote (Accuracy = {wwo_accs[i][j] * 100:.2f}%)"
+                    )
+                    axs[i][j].set_xlabel("Predicted label")
+                    axs[i][j].set_ylabel("True label")
 
-        for i in range(2):
-            for j in range(2 if i == 0 else 3):
-                sns.heatmap(
-                    wwo_cms[i][j],
-                    annot=True,
-                    fmt="d",
-                    cmap="Blues",
-                    cbar=False,
-                    square=True,
-                    ax=axs[i][j],
-                )
-                axs[i][j].set_title(
-                    f"{types[j]} {wwo[i]} Vote (Accuracy = {wwo_accs[i][j] * 100:.2f}%)"
-                )
-                axs[i][j].set_xlabel("Predicted label")
-                axs[i][j].set_ylabel("True label")
+            # 删除第一行第三个子图
+            fig.delaxes(axs[0, 2])
+            fig.suptitle(
+                f"Heatmap Comparison After {epoch} Epochs \
+                    net type: {NET_TYPE}, pps: {PPS_FOR}, Vote Size: {vote_size}, ",
+                fontsize=16,
+            )
 
-        # 删除第一行第三个子图
-        fig.delaxes(axs[0, 2])
-        fig.suptitle(
-            f"Heatmap Comparison After {epoch} Epochs \
-                net type: {NET_TYPE}, pps: {PPS_FOR}, Vote Size: {vote_size}, ",
-            fontsize=16,
-        )
-        plt.show()
+            dir_name = f"{PPS_FOR}_{NET_TYPE}_cft/"
+            if not os.path.exists(MODEL_DIR_PATH + dir_name):
+                os.makedirs(MODEL_DIR_PATH + dir_name)
+            pic_save_path = MODEL_DIR_PATH + dir_name + f"cft_{epoch}.png"
+            plt.savefig(pic_save_path)
+            # plt.show()
+        else:
+            print(f"Extractor_{epoch}.pth isn't exist")
 
     return
 
@@ -533,7 +561,7 @@ def test_rogue_device_detection(
     for epoch in TEST_LIST:
         print()
 
-        model = load_model(DIR_NAME + f"Extractor_{epoch}.pth")
+        model = load_model(MODEL_DIR_PATH + f"Extractor_{epoch}.pth")
 
         """
         设备注册
@@ -587,7 +615,7 @@ def test_rogue_device_detection(
 # In[] 主程序执行逻辑
 if __name__ == "__main__":
 
-    print(f"Net DIRNAME: {DIR_NAME}")
+    print(f"Net DIRNAME: {MODEL_DIR_PATH}")
 
     if RUN_FOR == "Train":
         print(
@@ -609,7 +637,7 @@ if __name__ == "__main__":
         save_data = f"train_data_{PPS_FOR}.h5"
         print(f"Convert Type: {PPS_FOR}")
 
-        if not os.path.exists(save_data):
+        if not os.path.exists(save_data) or NEW_FILE_FLAG == 1:
             print("Data Converting...")
 
             # 加载数据并开始训练
