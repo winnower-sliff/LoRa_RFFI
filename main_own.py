@@ -1,5 +1,5 @@
+import argparse
 from collections import Counter
-import copy
 import math
 import time
 import numpy as np
@@ -17,49 +17,176 @@ from sklearn.metrics import confusion_matrix, accuracy_score, roc_curve, auc
 from tqdm import tqdm
 
 from signal_trans import *
+from net.net_original import *
+from net.net_DRSN import *
 
-""" 基础设置 """
-
-# 不要 net_0 & pps_1
-# 0 for origin, 1 for drsn
-net_type = 1
-# 0 for stft, 1 for wst
-PROPRECESS_TYPE = 1
-# "Train" / "Classification" / "Rogue Device Detection"
-mode_type = 0
-# 我们需要一个新的训练文件吗？
-NEW_FILE_FLAG = 1
-
-TEST_LIST = [1, 5, 10, 20, 50, 100, 150, 200, 250, 300]
-# TEST_LIST = [1]
-
-
-if net_type == 0:
-    from net.net_original import *
-elif net_type == 1:
-    from net.net_DRSN import *
-if PROPRECESS_TYPE == 0:
-    PPS_FOR = "stft"
-    MODEL_DIR_PATH = f"./model/{PPS_FOR}/{NET_TYPE}/"
-else:
-    PPS_FOR = "wst"
-    WST_J = 4
-    WST_Q = 6
-    MODEL_DIR_PATH = f"./model/{PPS_FOR}_j{WST_J}q{WST_Q}/{NET_TYPE}/"
-
-if not os.path.exists(MODEL_DIR_PATH):
-    os.makedirs(MODEL_DIR_PATH)
-
-mode_class = ["Train", "Classification", "Rogue Device Detection"]
-RUN_FOR = mode_class[int(mode_type)]
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
+def main():
+    """基础设置"""
+    global PROPRECESS_TYPE, TEST_LIST, NET_NAME, PPS_FOR, MODEL_DIR_PATH, WST_J, WST_Q
+
+    # 不要 net_0 & pps_1
+    # 0 for origin, 1 for drsn
+    net_type = 1
+    # 0 for stft, 1 for wst
+    PROPRECESS_TYPE = 1
+    # "Train" / "Classification" / "Rogue Device Detection"
+    mode_type = 0
+    # 我们需要一个新的训练文件吗？
+    new_file_flag = 0
+
+    TEST_LIST = [1, 5, 10, 20, 50, 100, 150, 200, 250, 300]
+    # TEST_LIST = [1]
+
+    parser = argparse.ArgumentParser(description="参数设置")
+    parser.add_argument("-n", "--net", type=int, help="net_type", default=net_type)
+    parser.add_argument(
+        "-p", "--proprecess", type=int, help="proprecess", default=PROPRECESS_TYPE
+    )
+    parser.add_argument("-m", "--mode", type=int, help="mode_type", default=mode_type)
+    parser.add_argument(
+        "-f", "--new_file", type=int, help="NEW_FILE_FLAG", default=new_file_flag
+    )
+
+    args = parser.parse_args()
+    net_type, PROPRECESS_TYPE, mode_type, new_file_flag = (
+        args.net,
+        args.proprecess,
+        args.mode,
+        args.new_file,
+    )
+
+    print(args)
+
+    """后续设置"""
+
+    if net_type == 0:
+        NET_NAME = "origin"
+    elif net_type == 1:
+        NET_NAME = "drsn"
+
+    if PROPRECESS_TYPE == 0:
+        PPS_FOR = "stft"
+        MODEL_DIR_PATH = f"./model/{PPS_FOR}/{NET_NAME}/"
+    else:
+        PPS_FOR = "wst"
+        WST_J = 4
+        WST_Q = 6
+        MODEL_DIR_PATH = f"./model/{PPS_FOR}_j{WST_J}q{WST_Q}/{NET_NAME}/"
+
+    if not os.path.exists(MODEL_DIR_PATH):
+        os.makedirs(MODEL_DIR_PATH)
+
+    mode_class = ["Train", "Classification", "Rogue Device Detection"]
+    RUN_FOR = mode_class[int(mode_type)]
+
+    print(f"Net DIRNAME: {MODEL_DIR_PATH}")
+
+    if RUN_FOR == "Train":
+        print(
+            R"""
+ _____  ____  _        _      ____  ____  _____
+/__ __\/  __\/ \  /|  / \__/|/  _ \/  _ \/  __/
+  / \  |  \/|| |\ ||  | |\/||| / \|| | \||  \  
+  | |  |    /| | \||  | |  ||| \_/|| |_/||  /_ 
+  \_/  \_/\_\\_/  \|  \_/  \|\____/\____/\____\
+"""
+        )
+
+        data_path = "./dataset/Train/dataset_training_aug.h5"
+        dev_range = np.arange(0, 30, dtype=int)
+        pkt_range = np.arange(0, 1000, dtype=int)
+        snr_range = np.arange(20, 80)
+        convert_start_time = time.time()
+
+        save_data = f"train_data_{PPS_FOR}.h5"
+        print(f"Convert Type: {PPS_FOR}")
+
+        if not os.path.exists(save_data) or new_file_flag == 1:
+            print("Data Converting...")
+
+            # 加载数据并开始训练
+            LoadDatasetObj = LoadDataset()
+            data, labels = LoadDatasetObj.load_iq_samples(
+                data_path, dev_range, pkt_range
+            )
+            data = awgn(data, snr_range)
+            ChannelIndSpectrogramObj = ChannelIndSpectrogram()
+
+            data = proPrecessData(data, ChannelIndSpectrogramObj)
+
+            with h5py.File(save_data, "w") as f:
+                f.create_dataset("data", data=data)
+                f.create_dataset("labels", data=labels)
+            timeCost = time.time() - convert_start_time
+            print(f"Convert Time Cost: {timeCost:.3f}s")
+        else:
+            print("Data exist, loading...")
+            with h5py.File(save_data, "r") as f:
+                data = f["data"][:]
+                labels = f["labels"][:]
+
+            timeCost = time.time() - convert_start_time
+            print(f"Load Time Cost: {timeCost:.3f}s")
+
+        # 训练特征提取模型
+        prepare_and_train(data, labels, dev_range, num_epochs=max(TEST_LIST))
+
+    else:
+        if RUN_FOR == "Classification":
+            print(
+                R"""
+ ____  _____ _____    _      ____  ____  _____
+/   _\/    //__ __\  / \__/|/  _ \/  _ \/  __/
+|  /  |  __\  / \    | |\/||| / \|| | \||  \  
+|  \__| |     | |    | |  ||| \_/|| |_/||  /_ 
+\____/\_/     \_/    \_/  \|\____/\____/\____\
+"""
+            )
+
+            # 指定设备索引范围用于分类任务
+            test_dev_range = np.arange(30, 40, dtype=int)
+
+            # 执行分类任务
+            test_classification(
+                file_path_enrol="./dataset/Test/dataset_residential.h5",
+                file_path_clf="./dataset/Test/channel_problem/A.h5",
+                dev_range_enrol=test_dev_range,
+                pkt_range_enrol=np.arange(0, 100, dtype=int),
+                dev_range_clf=test_dev_range,
+                pkt_range_clf=np.arange(100, 200, dtype=int),
+            )
+
+        elif RUN_FOR == "Rogue Device Detection":
+            print(
+                R"""
+ ____  ____  ____    _      ____  ____  _____
+/  __\/  _ \/  _ \  / \__/|/  _ \/  _ \/  __/
+|  \/|| | \|| | \|  | |\/||| / \|| | \||  \  
+|    /| |_/|| |_/|  | |  ||| \_/|| |_/||  /_ 
+\_/\_\\____/\____/  \_/  \|\____/\____/\____\
+"""
+            )
+
+            # 执行恶意设备检测任务
+            test_rogue_device_detection(
+                file_path_enrol="./dataset/Test/dataset_residential.h5",
+                dev_range_enrol=np.arange(30, 40, dtype=int),
+                pkt_range_enrol=np.arange(0, 100, dtype=int),
+                file_path_legitimate="./dataset/Test/dataset_residential.h5",
+                dev_range_legitimate=np.arange(30, 40, dtype=int),
+                pkt_range_legitimate=np.arange(100, 200, dtype=int),
+                file_path_rogue="./dataset/Test/dataset_rogue.h5",
+                dev_range_rogue=np.arange(40, 45, dtype=int),
+                pkt_range_rogue=np.arange(0, 100, dtype=int),
+            )
+
+
 # 模型加载函数
-def load_model(
-    file_path=f"./model/{NET_TYPE}/Extractor_{max(TEST_LIST)}.pth", weights_only=True
-):
+def load_model(file_path, weights_only=True):
     """从指定路径加载模型"""
     model = TripletNet(in_channels=1 if PROPRECESS_TYPE == 0 else 2)
     model.load_state_dict(torch.load(file_path, weights_only=weights_only))
@@ -231,7 +358,7 @@ def prepare_and_train(
 
                     # 添加标题和图例
                     plt.title(
-                        f"Loss of {num_epochs} Epoch, Net: {NET_TYPE}, Convert Type: {PROPRECESS_TYPE}"
+                        f"Loss of {num_epochs} Epoch, Net: {NET_NAME}, Convert Type: {PROPRECESS_TYPE}"
                     )
                     fig.legend(
                         loc="upper right",
@@ -307,6 +434,7 @@ def test_classification(
         LoadDatasetObj,
         ChannelIndSpectrogramObj,
     )
+    print("\nData loaded!!!")
 
     for epoch in TEST_LIST:
         print()
@@ -438,11 +566,11 @@ def test_classification(
             fig.delaxes(axs[0, 2])
             fig.suptitle(
                 f"Heatmap Comparison After {epoch} Epochs \
-                    net type: {NET_TYPE}, pps: {PPS_FOR}, Vote Size: {vote_size}, ",
+                    net type: {NET_NAME}, pps: {PPS_FOR}, Vote Size: {vote_size}, ",
                 fontsize=16,
             )
 
-            dir_name = f"{PPS_FOR}_{NET_TYPE}_cft/"
+            dir_name = f"{PPS_FOR}_{NET_NAME}_cft/"
             if not os.path.exists(MODEL_DIR_PATH + dir_name):
                 os.makedirs(MODEL_DIR_PATH + dir_name)
             pic_save_path = MODEL_DIR_PATH + dir_name + f"cft_{epoch}.png"
@@ -614,104 +742,4 @@ def test_rogue_device_detection(
 
 # In[] 主程序执行逻辑
 if __name__ == "__main__":
-
-    print(f"Net DIRNAME: {MODEL_DIR_PATH}")
-
-    if RUN_FOR == "Train":
-        print(
-            R"""
- _____  ____  _        _      ____  ____  _____
-/__ __\/  __\/ \  /|  / \__/|/  _ \/  _ \/  __/
-  / \  |  \/|| |\ ||  | |\/||| / \|| | \||  \  
-  | |  |    /| | \||  | |  ||| \_/|| |_/||  /_ 
-  \_/  \_/\_\\_/  \|  \_/  \|\____/\____/\____\
-"""
-        )
-
-        data_path = "./dataset/Train/dataset_training_aug.h5"
-        dev_range = np.arange(0, 30, dtype=int)
-        pkt_range = np.arange(0, 1000, dtype=int)
-        snr_range = np.arange(20, 80)
-        convert_start_time = time.time()
-
-        save_data = f"train_data_{PPS_FOR}.h5"
-        print(f"Convert Type: {PPS_FOR}")
-
-        if not os.path.exists(save_data) or NEW_FILE_FLAG == 1:
-            print("Data Converting...")
-
-            # 加载数据并开始训练
-            LoadDatasetObj = LoadDataset()
-            data, labels = LoadDatasetObj.load_iq_samples(
-                data_path, dev_range, pkt_range
-            )
-            data = awgn(data, snr_range)
-            ChannelIndSpectrogramObj = ChannelIndSpectrogram()
-
-            data = proPrecessData(data, ChannelIndSpectrogramObj)
-
-            with h5py.File(save_data, "w") as f:
-                f.create_dataset("data", data=data)
-                f.create_dataset("labels", data=labels)
-            timeCost = time.time() - convert_start_time
-            print(f"Convert Time Cost: {timeCost:.3f}s")
-        else:
-            print("Data exist, loading...")
-            with h5py.File(save_data, "r") as f:
-                data = f["data"][:]
-                labels = f["labels"][:]
-
-            timeCost = time.time() - convert_start_time
-            print(f"Load Time Cost: {timeCost:.3f}s")
-
-        # 训练特征提取模型
-        prepare_and_train(data, labels, dev_range, num_epochs=max(TEST_LIST))
-
-    else:
-        if RUN_FOR == "Classification":
-            print(
-                R"""
- ____  _____ _____    _      ____  ____  _____
-/   _\/    //__ __\  / \__/|/  _ \/  _ \/  __/
-|  /  |  __\  / \    | |\/||| / \|| | \||  \  
-|  \__| |     | |    | |  ||| \_/|| |_/||  /_ 
-\____/\_/     \_/    \_/  \|\____/\____/\____\
-"""
-            )
-
-            # 指定设备索引范围用于分类任务
-            test_dev_range = np.arange(30, 40, dtype=int)
-
-            # 执行分类任务
-            test_classification(
-                file_path_enrol="./dataset/Test/dataset_residential.h5",
-                file_path_clf="./dataset/Test/channel_problem/A.h5",
-                dev_range_enrol=test_dev_range,
-                pkt_range_enrol=np.arange(0, 100, dtype=int),
-                dev_range_clf=test_dev_range,
-                pkt_range_clf=np.arange(100, 200, dtype=int),
-            )
-
-        elif RUN_FOR == "Rogue Device Detection":
-            print(
-                R"""
- ____  ____  ____    _      ____  ____  _____
-/  __\/  _ \/  _ \  / \__/|/  _ \/  _ \/  __/
-|  \/|| | \|| | \|  | |\/||| / \|| | \||  \  
-|    /| |_/|| |_/|  | |  ||| \_/|| |_/||  /_ 
-\_/\_\\____/\____/  \_/  \|\____/\____/\____\
-"""
-            )
-
-            # 执行恶意设备检测任务
-            test_rogue_device_detection(
-                file_path_enrol="./dataset/Test/dataset_residential.h5",
-                dev_range_enrol=np.arange(30, 40, dtype=int),
-                pkt_range_enrol=np.arange(0, 100, dtype=int),
-                file_path_legitimate="./dataset/Test/dataset_residential.h5",
-                dev_range_legitimate=np.arange(30, 40, dtype=int),
-                pkt_range_legitimate=np.arange(100, 200, dtype=int),
-                file_path_rogue="./dataset/Test/dataset_rogue.h5",
-                dev_range_rogue=np.arange(40, 45, dtype=int),
-                pkt_range_rogue=np.arange(0, 100, dtype=int),
-            )
+    main()

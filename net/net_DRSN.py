@@ -14,9 +14,6 @@ import torch.nn.functional as F
 from torch.utils.data import Dataset
 
 
-NET_TYPE = "drsn"
-
-
 # 自定义Dataset类，用于三元组生成
 # 更新后的 TripletDataset 类
 class TripletDataset(Dataset):

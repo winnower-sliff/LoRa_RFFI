@@ -5,8 +5,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import Dataset
 
-NET_TYPE = "origin"
-
 
 # 自定义Dataset类，用于三元组生成
 # 更新后的 TripletDataset 类
