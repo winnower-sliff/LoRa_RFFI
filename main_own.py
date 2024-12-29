@@ -36,10 +36,13 @@ def main():
     # "Train" / "Classification" / "Rogue Device Detection"
     mode_type = 0
     # 我们需要一个新的训练文件吗？
-    new_file_flag = 0
+    new_file_flag = 1
 
     TEST_LIST = [1, 5, 10, 20, 50, 100, 150, 200, 250, 300]
     # TEST_LIST = [1]
+
+    WST_J = 6
+    WST_Q = 8
 
     parser = argparse.ArgumentParser(description="参数设置")
     parser.add_argument("-n", "--net", type=int, help="net_type", default=net_type)
@@ -50,16 +53,22 @@ def main():
     parser.add_argument(
         "-f", "--new_file", type=int, help="NEW_FILE_FLAG", default=new_file_flag
     )
+    parser.add_argument("-j", "--wst_j", type=int, help="NEW_FILE_FLAG", default=WST_J)
+    parser.add_argument("-q", "--wst_q", type=int, help="NEW_FILE_FLAG", default=WST_Q)
 
     args = parser.parse_args()
-    net_type, PROPRECESS_TYPE, mode_type, new_file_flag = (
+    net_type, PROPRECESS_TYPE, mode_type, new_file_flag, WST_J, WST_Q = (
         args.net,
         args.proprecess,
         args.mode,
         args.new_file,
+        args.wst_j,
+        args.wst_q,
     )
 
     print(args)
+    # print("Press Enter to continue...")
+    # input()  # 等待用户按下Enter键
 
     """后续设置"""
 
@@ -71,11 +80,12 @@ def main():
     if PROPRECESS_TYPE == 0:
         PPS_FOR = "stft"
         MODEL_DIR_PATH = f"./model/{PPS_FOR}/{NET_NAME}/"
+        trn_save_data = f"train_data_{PPS_FOR}.h5"
     else:
         PPS_FOR = "wst"
-        WST_J = 4
-        WST_Q = 6
+
         MODEL_DIR_PATH = f"./model/{PPS_FOR}_j{WST_J}q{WST_Q}/{NET_NAME}/"
+        trn_save_data = f"train_data_{PPS_FOR}_j{WST_J}q{WST_Q}.h5"
 
     if not os.path.exists(MODEL_DIR_PATH):
         os.makedirs(MODEL_DIR_PATH)
@@ -102,10 +112,9 @@ def main():
         snr_range = np.arange(20, 80)
         convert_start_time = time.time()
 
-        save_data = f"train_data_{PPS_FOR}.h5"
         print(f"Convert Type: {PPS_FOR}")
 
-        if not os.path.exists(save_data) or new_file_flag == 1:
+        if not os.path.exists(trn_save_data) or new_file_flag == 1:
             print("Data Converting...")
 
             # 加载数据并开始训练
@@ -118,14 +127,14 @@ def main():
 
             data = proPrecessData(data, ChannelIndSpectrogramObj)
 
-            with h5py.File(save_data, "w") as f:
+            with h5py.File(trn_save_data, "w") as f:
                 f.create_dataset("data", data=data)
                 f.create_dataset("labels", data=labels)
             timeCost = time.time() - convert_start_time
             print(f"Convert Time Cost: {timeCost:.3f}s")
         else:
             print("Data exist, loading...")
-            with h5py.File(save_data, "r") as f:
+            with h5py.File(trn_save_data, "r") as f:
                 data = f["data"][:]
                 labels = f["labels"][:]
 

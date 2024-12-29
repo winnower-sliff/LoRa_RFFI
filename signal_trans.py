@@ -7,7 +7,16 @@ from numpy.random import standard_normal, uniform
 import scipy.signal as signal
 import h5py
 from kymatio import Scattering1D
+from kymatio.scattering1d.filter_bank import scattering_filter_factory
+
 from tqdm import tqdm
+import pywt
+
+
+def db1_filter(J, shape):
+    wavelet = pywt.Wavelet("db1")
+    filters = scattering_filter_factory(shape=shape, J=J, wavelet=wavelet)
+    return filters
 
 
 # Dataset loader class for IQ samples
@@ -246,14 +255,20 @@ class ChannelIndSpectrogram:
         num_sample, sample_length = data.shape
 
         # 初始化小波散射
-        scattering = Scattering1D(J=J, Q=Q, shape=(sample_length,))
+        scattering = Scattering1D(
+            J=J,
+            Q=Q,
+            shape=(sample_length,),
+            filter=db1_filter(J=J, shape=data.shape[1]),
+        )
 
         # 计算小波散射输出形状
         scatter_example = scattering(np.real(data[0]))  # 使用第一个样本计算输出
         num_row, num_column = scatter_example.shape  # 确定时间点数和特征数
 
         # 初始化存储矩阵
-        data_wav_spec = np.zeros((num_sample, 2, ceil(0.4 * num_row), num_column - 1))
+        s, e = floor(0.1 * num_row), floor(0.4 * num_row)
+        data_wav_spec = np.zeros((num_sample, 2, e - s, num_column - 1))
 
         for i in tqdm(range(num_sample)):
             sig = np.asarray(data[i])  # 当前样本信号
@@ -268,24 +283,22 @@ class ChannelIndSpectrogram:
 
             # 将实部和虚部结果组合（例如计算幅度）
             scatter_combined = np.stack((scatter_real, scatter_imag), axis=0)
-            scatter_combined = scatter_combined[
-                :, floor(0.2 * num_row) : floor(0.6 * num_row)
-            ]
+            scatter_combined = scatter_combined[:, s:e]
             # Generate channel independent spectrogram.
             scatter_combined = scatter_combined[:, :, 1:] / scatter_combined[:, :, :-1]
             scatter_combined = np.log10(np.abs(scatter_combined) ** 2)
 
             """绘制结果，不要删除！！！"""
-            # for i in range(2):
-            #     plt.imshow(
-            #         scatter_combined[i], aspect="auto", cmap="viridis", origin="lower"
-            #     )
-            #     plt.title("Wavelet Scattering Coefficients")
-            #     plt.xlabel("Time")
-            #     plt.ylabel("Scattering Coefficients")
-            #     plt.colorbar(label="Amplitude")
-            #     plt.show()
-            #     print(1)
+            for i in range(2):
+                plt.imshow(
+                    scatter_combined[i], aspect="auto", cmap="viridis", origin="lower"
+                )
+                plt.title("Wavelet Scattering Coefficients")
+                plt.xlabel("Time")
+                plt.ylabel("Scattering Coefficients")
+                plt.colorbar(label="Amplitude")
+                plt.show()
+                print(1)
 
             # 存储结果
             data_wav_spec[i] = scatter_combined
