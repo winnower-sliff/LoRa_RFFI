@@ -7,16 +7,7 @@ from numpy.random import standard_normal, uniform
 import scipy.signal as signal
 import h5py
 from kymatio import Scattering1D
-from kymatio.scattering1d.filter_bank import scattering_filter_factory
-
 from tqdm import tqdm
-import pywt
-
-
-def db1_filter(J, shape):
-    wavelet = pywt.Wavelet("db1")
-    filters = scattering_filter_factory(shape=shape, J=J, wavelet=wavelet)
-    return filters
 
 
 # Dataset loader class for IQ samples
@@ -255,12 +246,12 @@ class ChannelIndSpectrogram:
         num_sample, sample_length = data.shape
 
         # 初始化小波散射
-        scattering = Scattering1D(
-            J=J,
-            Q=Q,
-            shape=(sample_length,),
-            filter=db1_filter(J=J, shape=data.shape[1]),
-        )
+        scattering = Scattering1D(J=J, Q=Q, shape=(sample_length,))
+
+        meta = scattering.meta()
+        order0 = np.where(meta["order"] == 0)
+        order1 = np.where(meta["order"] == 1)[0]
+        order2 = np.where(meta["order"] == 2)
 
         # 计算小波散射输出形状
         scatter_example = scattering(np.real(data[0]))  # 使用第一个样本计算输出
@@ -268,7 +259,7 @@ class ChannelIndSpectrogram:
 
         # 初始化存储矩阵
         s, e = floor(0.1 * num_row), floor(0.4 * num_row)
-        data_wav_spec = np.zeros((num_sample, 2, e - s, num_column - 1))
+        data_wav_spec = np.zeros((num_sample, 2, len(order1), num_column-1 ))
 
         for i in tqdm(range(num_sample)):
             sig = np.asarray(data[i])  # 当前样本信号
@@ -281,25 +272,42 @@ class ChannelIndSpectrogram:
             scatter_real = scattering(real_part)
             scatter_imag = scattering(imag_part)
 
-            # 将实部和虚部结果组合（例如计算幅度）
+            # # 将实部和虚部结果组合（例如计算幅度）
             scatter_combined = np.stack((scatter_real, scatter_imag), axis=0)
-            scatter_combined = scatter_combined[:, s:e]
-            # Generate channel independent spectrogram.
-            scatter_combined = scatter_combined[:, :, 1:] / scatter_combined[:, :, :-1]
-            scatter_combined = np.log10(np.abs(scatter_combined) ** 2)
+            # scatter_combined = scatter_combined[:, s:e]
+            # # Generate channel independent spectrogram.
+            # scatter_combined = scatter_combined[:, :, 1:] / scatter_combined[:, :, :-1]
+            # scatter_combined = np.log10(np.abs(scatter_combined) ** 2)
 
             """绘制结果，不要删除！！！"""
             for i in range(2):
-                plt.imshow(
-                    scatter_combined[i], aspect="auto", cmap="viridis", origin="lower"
+                plt.figure(figsize=(8, 8))
+                plt.subplot(3, 1, 1)
+                plt.plot(scatter_combined[i][order0][0])
+                plt.title("Zeroth-order scattering")
+                plt.subplot(3, 1, 2)
+                plt.imshow(scatter_combined[i][order1], aspect="auto")
+                plt.title("First-order scattering")
+                plt.subplot(3, 1, 3)
+                plt.imshow(scatter_combined[i][order2], aspect="auto")
+                plt.title("Second-order scattering")
+                plt.tight_layout()
+                print(
+                    scatter_combined[i][order1].shape, scatter_combined[i][order2].shape
                 )
-                plt.title("Wavelet Scattering Coefficients")
-                plt.xlabel("Time")
-                plt.ylabel("Scattering Coefficients")
-                plt.colorbar(label="Amplitude")
                 plt.show()
-                print(1)
 
+            scatter_combined = scatter_combined[:, order1]
+            scatter_combined = scatter_combined[:, :, 1:] / scatter_combined[:, :, :-1]
+
+            for i in range(2):
+                plt.figure()
+
+                plt.imshow(scatter_combined[i], aspect="auto")
+                plt.title("First-order scattering")
+
+
+                plt.show()
             # 存储结果
             data_wav_spec[i] = scatter_combined
         return data_wav_spec

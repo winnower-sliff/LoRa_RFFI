@@ -41,8 +41,8 @@ def main():
     TEST_LIST = [1, 5, 10, 20, 50, 100, 150, 200, 250, 300]
     # TEST_LIST = [1]
 
-    WST_J = 6
-    WST_Q = 8
+    WST_J = 7
+    WST_Q = 12
 
     parser = argparse.ArgumentParser(description="参数设置")
     parser.add_argument("-n", "--net", type=int, help="net_type", default=net_type)
@@ -353,7 +353,7 @@ def prepare_and_train(
                 tqdm.write(f"Model saved to {file_path}")
 
                 if (epoch + 1) in TEST_LIST[-3:]:
-                    print("Plotting results... ")
+                    # print("Plotting results... ")
                     fig, ax1 = plt.subplots()
                     ax1.plot(
                         range(len(loss_perepoch)),
