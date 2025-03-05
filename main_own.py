@@ -16,9 +16,12 @@ from sklearn.neighbors import KNeighborsClassifier
 from sklearn.metrics import confusion_matrix, accuracy_score, roc_curve, auc
 from tqdm import tqdm
 
+from TripletDataset import *
 from signal_trans import *
 from net.net_original import *
 from net.net_DRSN import *
+
+from TSNE import tsne_3d_plot
 
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -32,7 +35,7 @@ def main():
     # 0 for origin, 1 for drsn
     net_type = 1
     # 0 for stft, 1 for wst
-    PROPRECESS_TYPE = 1
+    PROPRECESS_TYPE = 0
     # "Train" / "Classification" / "Rogue Device Detection"
     mode_type = 0
     # 我们需要一个新的训练文件吗？
@@ -41,8 +44,8 @@ def main():
     TEST_LIST = [1, 5, 10, 20, 50, 100, 150, 200, 250, 300]
     # TEST_LIST = [1]
 
-    WST_J = 7
-    WST_Q = 12
+    WST_J = 6
+    WST_Q = 6
 
     parser = argparse.ArgumentParser(description="参数设置")
     parser.add_argument("-n", "--net", type=int, help="net_type", default=net_type)
@@ -80,12 +83,11 @@ def main():
     if PROPRECESS_TYPE == 0:
         PPS_FOR = "stft"
         MODEL_DIR_PATH = f"./model/{PPS_FOR}/{NET_NAME}/"
-        trn_save_data = f"train_data_{PPS_FOR}.h5"
+        filename_train_prepare_data = f"train_data_{PPS_FOR}.h5"
     else:
         PPS_FOR = "wst"
-
         MODEL_DIR_PATH = f"./model/{PPS_FOR}_j{WST_J}q{WST_Q}/{NET_NAME}/"
-        trn_save_data = f"train_data_{PPS_FOR}_j{WST_J}q{WST_Q}.h5"
+        filename_train_prepare_data = f"train_data_{PPS_FOR}_j{WST_J}q{WST_Q}.h5"
 
     if not os.path.exists(MODEL_DIR_PATH):
         os.makedirs(MODEL_DIR_PATH)
@@ -106,43 +108,19 @@ def main():
 """
         )
 
-        data_path = "./dataset/Train/dataset_training_aug.h5"
-        dev_range = np.arange(0, 30, dtype=int)
-        pkt_range = np.arange(0, 1000, dtype=int)
-        snr_range = np.arange(20, 80)
-        convert_start_time = time.time()
-
         print(f"Convert Type: {PPS_FOR}")
 
-        if not os.path.exists(trn_save_data) or new_file_flag == 1:
-            print("Data Converting...")
-
-            # 加载数据并开始训练
-            LoadDatasetObj = LoadDataset()
-            data, labels = LoadDatasetObj.load_iq_samples(
-                data_path, dev_range, pkt_range
-            )
-            data = awgn(data, snr_range)
-            ChannelIndSpectrogramObj = ChannelIndSpectrogram()
-
-            data = proPrecessData(data, ChannelIndSpectrogramObj)
-
-            with h5py.File(trn_save_data, "w") as f:
-                f.create_dataset("data", data=data)
-                f.create_dataset("labels", data=labels)
-            timeCost = time.time() - convert_start_time
-            print(f"Convert Time Cost: {timeCost:.3f}s")
-        else:
-            print("Data exist, loading...")
-            with h5py.File(trn_save_data, "r") as f:
-                data = f["data"][:]
-                labels = f["labels"][:]
-
-            timeCost = time.time() - convert_start_time
-            print(f"Load Time Cost: {timeCost:.3f}s")
+        data, labels = prepare_train_data(
+            new_file_flag,
+            filename_train_prepare_data,
+            path_train_original_data="./dataset/Train/dataset_training_aug.h5",
+            dev_range=np.arange(0, 30, dtype=int),
+            pkt_range=np.arange(0, 1000, dtype=int),
+            snr_range=np.arange(20, 80),
+        )
 
         # 训练特征提取模型
-        prepare_and_train(data, labels, dev_range, num_epochs=max(TEST_LIST))
+        train(data, labels, num_epochs=max(TEST_LIST))
 
     else:
         if RUN_FOR == "Classification":
@@ -156,17 +134,14 @@ def main():
 """
             )
 
-            # 指定设备索引范围用于分类任务
-            test_dev_range = np.arange(30, 40, dtype=int)
-
             # 执行分类任务
             test_classification(
-                file_path_enrol="./dataset/Test/dataset_residential.h5",
-                file_path_clf="./dataset/Test/channel_problem/A.h5",
-                dev_range_enrol=test_dev_range,
-                pkt_range_enrol=np.arange(0, 100, dtype=int),
-                dev_range_clf=test_dev_range,
-                pkt_range_clf=np.arange(100, 200, dtype=int),
+                file_path_enrol="./4307data/data_devs6_t800_1M_sf7_rev2_indoor_4k8.h5",
+                file_path_clf="./4307data/data_2025.2.26.h5",
+                dev_range_enrol=np.arange(0, 6, dtype=int),
+                pkt_range_enrol=np.arange(0, 800, dtype=int),
+                dev_range_clf=np.arange(0, 6, dtype=int),
+                pkt_range_clf=np.arange(000, 200, dtype=int),
             )
 
         elif RUN_FOR == "Rogue Device Detection":
@@ -194,6 +169,52 @@ def main():
             )
 
 
+def prepare_train_data(
+    new_file_flag,
+    filename_train_prepare_data,
+    path_train_original_data,
+    dev_range,
+    pkt_range,
+    snr_range,
+):
+    """
+    准备训练集
+
+    根据选择的信号处理类型生成对应的训练集
+    """
+    time_prepare_start = time.time()
+    # 数据预处理
+    if not os.path.exists(filename_train_prepare_data) or new_file_flag == 1:
+        # 需要新处理数据
+        print("Data Converting...")
+
+        LoadDatasetObj = LoadDataset()
+        data, labels = LoadDatasetObj.load_iq_samples(
+            path_train_original_data, dev_range, pkt_range
+        )
+        data = awgn(data, snr_range)
+        TimeFrequencyTransformerObj = TimeFrequencyTransformer()
+
+        data = generate_spectrogram(data, TimeFrequencyTransformerObj)
+
+        with h5py.File(filename_train_prepare_data, "w") as f:
+            f.create_dataset("data", data=data)
+            f.create_dataset("labels", data=labels)
+        timeCost = time.time() - time_prepare_start
+        print(f"Convert Time Cost: {timeCost:.3f}s")
+    else:
+        # 处理数据已存在
+        print("Data exist, loading...")
+
+        with h5py.File(filename_train_prepare_data, "r") as f:
+            data = f["data"][:]
+            labels = f["labels"][:]
+
+        timeCost = time.time() - time_prepare_start
+        print(f"Load Time Cost: {timeCost:.3f}s")
+    return data, labels
+
+
 # 模型加载函数
 def load_model(file_path, weights_only=True):
     """从指定路径加载模型"""
@@ -205,27 +226,32 @@ def load_model(file_path, weights_only=True):
 
 
 # 数据预处理函数
-def proPrecessData(data, ChannelIndSpectrogramObj: ChannelIndSpectrogram):
-    """数据预处理方式选择"""
+def generate_spectrogram(data, TF_Transformer: TimeFrequencyTransformer):
+    """
+    数据预处理方式选择
+
+    - PROPRECESS_TYPE : 0 信道独立的STFT
+    - PROPRECESS_TYPE : 1 小波散射变换
+    """
 
     if PROPRECESS_TYPE == 0:
-        data = ChannelIndSpectrogramObj.channel_ind_spectrogram(data)
+        data = TF_Transformer.generate_stft_channel(data)
     if PROPRECESS_TYPE == 1:
-        data = ChannelIndSpectrogramObj.wavelet_scattering(data, J=WST_J, Q=WST_Q)
+        data = TF_Transformer.generate_WST(data, J=WST_J, Q=WST_Q)
     return data
 
 
 # 部分数据加载 & 预处理函数
-def load_pps_data(
+def load_and_preprocess_data(
     file_path,
     dev_range,
     pkt_range,
     LoadDatasetObj: LoadDataset,
-    ChannelIndSpectrogramObj: ChannelIndSpectrogram,
+    TimeFrequencyTransformerObj: TimeFrequencyTransformer,
 ):
     """加载 & 预处理数据"""
     data, label = LoadDatasetObj.load_iq_samples(file_path, dev_range, pkt_range)
-    data = proPrecessData(data, ChannelIndSpectrogramObj)
+    data = generate_spectrogram(data, TimeFrequencyTransformerObj)
 
     # 准备三元组数据
     triplet_data = [data, data, data]
@@ -237,9 +263,7 @@ def load_pps_data(
 
 
 # 数据准备与模型训练
-def prepare_and_train(
-    data, labels, dev_range, batch_size=32, num_epochs=200, learning_rate=1e-3
-):
+def train(data, labels, batch_size=32, num_epochs=200, learning_rate=1e-3):
     """
     准备数据并训练三元组网络模型。
 
@@ -269,7 +293,7 @@ def prepare_and_train(
     )
 
     # 生成数据加载器
-    train_dataset = TripletDataset(data_train, labels_train, dev_range)
+    train_dataset = TripletDataset(data_train, labels_train)
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
     batch_num = math.ceil(len(train_dataset) / batch_size)
 
@@ -277,14 +301,10 @@ def prepare_and_train(
     model = TripletNet(in_channels=1 if PROPRECESS_TYPE == 0 else 2)
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
     loss_fn = TripletLoss(margin=0.1)
-    # model = load_model(DIR_NAME + f"Extractor_{epoch}.pth")
 
     # 训练模型
     model.to(DEVICE)
     model.train()
-
-    # 测试用
-    # num_epochs = 300
 
     print(
         "\n---------------------\n"
@@ -293,7 +313,7 @@ def prepare_and_train(
         "Num of train batch: {}\n"
         "---------------------\n".format(num_epochs, batch_size, batch_num)
     )
-    loss_perepoch = []
+    loss_per_epoch = []
 
     with tqdm(total=num_epochs, desc="Total Progress") as total_bar:
         for epoch in range(num_epochs):
@@ -335,29 +355,27 @@ def prepare_and_train(
             )
 
             tqdm.write(text)
-            loss_perepoch.append(loss_ep)
+            loss_per_epoch.append(loss_ep)
 
             # 保存训练好的模型
             if (epoch + 1) in TEST_LIST:
-
-                # models.append((epoch + 1, copy.deepcopy(model)))
-                # print(f"Extractor {epoch+1} saving...")
-                # save_model(model=model, file_path=f"./model/wt_1/Extractor_{epoch+1}.pth")
-
+                # 创建文件夹&文件
                 if not os.path.exists(MODEL_DIR_PATH):
                     os.makedirs(MODEL_DIR_PATH)
-                fileName = f"Extractor_{epoch + 1}.pth"
-                """保存模型到指定路径"""
-                file_path = MODEL_DIR_PATH + fileName
+                file_name = f"Extractor_{epoch + 1}.pth"
+
+                # 保存模型到指定路径
+                file_path = MODEL_DIR_PATH + file_name
                 torch.save(model.state_dict(), file_path)
                 tqdm.write(f"Model saved to {file_path}")
 
+                # 绘制loss折线图
                 if (epoch + 1) in TEST_LIST[-3:]:
                     # print("Plotting results... ")
                     fig, ax1 = plt.subplots()
                     ax1.plot(
-                        range(len(loss_perepoch)),
-                        loss_perepoch,
+                        range(len(loss_per_epoch)),
+                        loss_per_epoch,
                         label="Loss",
                         color="red",
                     )
@@ -414,7 +432,7 @@ def test_classification(
     """
     # 加载数据
     LoadDatasetObj = LoadDataset()
-    ChannelIndSpectrogramObj = ChannelIndSpectrogram()
+    TF_TransformerObj = TimeFrequencyTransformer()
 
     vote_size = 10
     weight_knn = 0.5
@@ -426,22 +444,22 @@ def test_classification(
 
     # 加载注册数据集（IQ样本和标签）
     print("\nData loading...")
-    label_enrol, triplet_data_enrol = load_pps_data(
+    label_enrol, triplet_data_enrol = load_and_preprocess_data(
         file_path_enrol,
         dev_range_enrol,
         pkt_range_enrol,
         LoadDatasetObj,
-        ChannelIndSpectrogramObj,
+        TF_TransformerObj,
     )
 
     # 加载分类数据集（IQ样本和标签）
 
-    label_clf, triplet_data_clf = load_pps_data(
+    label_clf, triplet_data_clf = load_and_preprocess_data(
         file_path_clf,
         dev_range_clf,
         pkt_range_clf,
         LoadDatasetObj,
-        ChannelIndSpectrogramObj,
+        TF_TransformerObj,
     )
     print("\nData loaded!!!")
 
@@ -584,7 +602,11 @@ def test_classification(
                 os.makedirs(MODEL_DIR_PATH + dir_name)
             pic_save_path = MODEL_DIR_PATH + dir_name + f"cft_{epoch}.png"
             plt.savefig(pic_save_path)
+            print(f"save place: {pic_save_path}")
             # plt.show()
+
+            # T-SNE 3D绘图
+            # tsne_3d_plot(feature_clf[0],labels=label_clf)
         else:
             print(f"Extractor_{epoch}.pth isn't exist")
 
@@ -645,19 +667,19 @@ def test_rogue_device_detection(
 
     # 加载和处理数据
     LoadDatasetObj = LoadDataset()
-    ChannelIndSpectrogramObj = ChannelIndSpectrogram()
+    TimeFrequencyTransformerObj = TimeFrequencyTransformer()
 
     """
     加载注册设备数据
     """
     print("\nDevice enrolling...")
     # 加载注册数据集（IQ样本和标签）
-    label_enrol, triplet_data_enrol = load_pps_data(
+    label_enrol, triplet_data_enrol = load_and_preprocess_data(
         file_path_enrol,
         dev_range_enrol,
         pkt_range_enrol,
         LoadDatasetObj,
-        ChannelIndSpectrogramObj,
+        TimeFrequencyTransformerObj,
     )
 
     """
@@ -680,7 +702,7 @@ def test_rogue_device_detection(
     )
 
     # 提取特征
-    data_test = proPrecessData(data_test, ChannelIndSpectrogramObj)
+    data_test = generate_spectrogram(data_test, TimeFrequencyTransformerObj)
 
     # 准备三元组数据
     triplet_data_test = [
