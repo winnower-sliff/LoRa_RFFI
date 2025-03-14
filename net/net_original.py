@@ -1,8 +1,6 @@
 import torch.nn as nn
 import torch.nn.functional as F
 
-from TripletDataset import TripletLoss
-
 
 # 定义残差块
 class ResBlock(nn.Module):
@@ -49,20 +47,3 @@ class FeatureExtractor(nn.Module):
         x = self.flatten(x)
         x = F.normalize(self.fc(x), p=2, dim=1)  # L2 正则化
         return x
-
-
-# TripletNet类，用于创建三元组网络
-class TripletNet(nn.Module):
-    def __init__(self, in_channels, margin=0.1):
-        super(TripletNet, self).__init__()
-        self.margin = margin
-        self.embedding_net = FeatureExtractor(in_channels=in_channels)
-
-    def forward(self, anchor, positive, negative):
-        embedded_anchor = self.embedding_net(anchor)
-        embedded_positive = self.embedding_net(positive)
-        embedded_negative = self.embedding_net(negative)
-        return embedded_anchor, embedded_positive, embedded_negative
-
-    def triplet_loss(self, anchor, positive, negative):
-        return TripletLoss.apply(anchor, positive, negative, self.margin)

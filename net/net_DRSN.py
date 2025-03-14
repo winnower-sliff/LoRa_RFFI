@@ -2,8 +2,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from TripletDataset import TripletLoss
-
 
 class Shrinkage(nn.Module):
     def __init__(self, channel, gap_size):
@@ -155,34 +153,11 @@ class RSNet(nn.Module):
         return output
 
 
-def _rsnet18(in_channels):
+def drsnet18(in_channels):
     """return a RsNet 18 object"""
     return RSNet(BasicBlock, [2, 2, 2, 2], in_channels)
 
 
-def _rsnet34(in_channels):
+def drsnet34(in_channels):
     """return a RsNet 34 object"""
     return RSNet(BasicBlock, [3, 4, 6, 3], in_channels)
-
-
-# def resnet50():
-#     """ return a ResNet 50 object
-#     """
-#     return ResNet(BottleNeck, [3, 4, 6, 3])
-
-
-# TripletNet类，用于创建三元组网络
-class TripletNet(nn.Module):
-    def __init__(self, in_channels, margin=0.1):
-        super(TripletNet, self).__init__()
-        self.margin = margin
-        self.embedding_net = _rsnet18(in_channels=in_channels)
-
-    def forward(self, anchor, positive, negative):
-        embedded_anchor = self.embedding_net(anchor)
-        embedded_positive = self.embedding_net(positive)
-        embedded_negative = self.embedding_net(negative)
-        return embedded_anchor, embedded_positive, embedded_negative
-
-    def triplet_loss(self, anchor, positive, negative):
-        return TripletLoss.apply(anchor, positive, negative, self.margin)

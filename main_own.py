@@ -2,6 +2,7 @@ import argparse
 from collections import Counter
 import math
 import time
+import h5py
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -16,12 +17,18 @@ from sklearn.neighbors import KNeighborsClassifier
 from sklearn.metrics import confusion_matrix, accuracy_score, roc_curve, auc
 from tqdm import tqdm
 
-from TripletDataset import *
-from signal_trans import *
-from net.net_original import *
-from net.net_DRSN import *
+from TripletDataset import TripletDataset, TripletLoss
+from net.TripletNet import TripletNet
+from signal_trans import awgn
 
 from TSNE import tsne_3d_plot
+from utils import (
+    generate_spectrogram,
+    load_data,
+    load_generate_triplet,
+    load_model,
+    print_colored_text,
+)
 
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -29,15 +36,15 @@ DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 def main():
     """基础设置"""
-    global PROPRECESS_TYPE, TEST_LIST, NET_NAME, PPS_FOR, MODEL_DIR_PATH, WST_J, WST_Q
+    global NET_TYPE, PROPRECESS_TYPE, TEST_LIST, NET_NAME, PPS_FOR, MODEL_DIR_PATH, WST_J, WST_Q
 
     # 不要 net_0 & pps_1
     # 0 for origin, 1 for drsn
-    net_type = 1
+    NET_TYPE = 1
     # 0 for stft, 1 for wst
     PROPRECESS_TYPE = 0
     # "Train" / "Classification" / "Rogue Device Detection"
-    mode_type = 0
+    mode_type = 1
     # 我们需要一个新的训练文件吗？
     new_file_flag = 1
 
@@ -48,7 +55,7 @@ def main():
     WST_Q = 6
 
     parser = argparse.ArgumentParser(description="参数设置")
-    parser.add_argument("-n", "--net", type=int, help="net_type", default=net_type)
+    parser.add_argument("-n", "--net", type=int, help="net_type", default=NET_TYPE)
     parser.add_argument(
         "-p", "--proprecess", type=int, help="proprecess", default=PROPRECESS_TYPE
     )
@@ -60,7 +67,7 @@ def main():
     parser.add_argument("-q", "--wst_q", type=int, help="NEW_FILE_FLAG", default=WST_Q)
 
     args = parser.parse_args()
-    net_type, PROPRECESS_TYPE, mode_type, new_file_flag, WST_J, WST_Q = (
+    NET_TYPE, PROPRECESS_TYPE, mode_type, new_file_flag, WST_J, WST_Q = (
         args.net,
         args.proprecess,
         args.mode,
@@ -75,19 +82,19 @@ def main():
 
     """后续设置"""
 
-    if net_type == 0:
+    if NET_TYPE == 0:
         NET_NAME = "origin"
-    elif net_type == 1:
+    elif NET_TYPE == 1:
         NET_NAME = "drsn"
 
     if PROPRECESS_TYPE == 0:
         PPS_FOR = "stft"
         MODEL_DIR_PATH = f"./model/{PPS_FOR}/{NET_NAME}/"
-        filename_train_prepare_data = f"train_data_{PPS_FOR}.h5"
+        filename_train_prepared_data = f"train_data_{PPS_FOR}.h5"
     else:
         PPS_FOR = "wst"
         MODEL_DIR_PATH = f"./model/{PPS_FOR}_j{WST_J}q{WST_Q}/{NET_NAME}/"
-        filename_train_prepare_data = f"train_data_{PPS_FOR}_j{WST_J}q{WST_Q}.h5"
+        filename_train_prepared_data = f"train_data_{PPS_FOR}_j{WST_J}q{WST_Q}.h5"
 
     if not os.path.exists(MODEL_DIR_PATH):
         os.makedirs(MODEL_DIR_PATH)
@@ -98,84 +105,62 @@ def main():
     print(f"Net DIRNAME: {MODEL_DIR_PATH}")
 
     if RUN_FOR == "Train":
-        print(
-            R"""
- _____  ____  _        _      ____  ____  _____
-/__ __\/  __\/ \  /|  / \__/|/  _ \/  _ \/  __/
-  / \  |  \/|| |\ ||  | |\/||| / \|| | \||  \  
-  | |  |    /| | \||  | |  ||| \_/|| |_/||  /_ 
-  \_/  \_/\_\\_/  \|  \_/  \|\____/\____/\____\
-"""
-        )
+        # 训练模式
+        print_colored_text("训练模式", "32")
 
         print(f"Convert Type: {PPS_FOR}")
 
         data, labels = prepare_train_data(
             new_file_flag,
-            filename_train_prepare_data,
+            filename_train_prepared_data,
             path_train_original_data="./dataset/Train/dataset_training_aug.h5",
             dev_range=np.arange(0, 30, dtype=int),
             pkt_range=np.arange(0, 1000, dtype=int),
             snr_range=np.arange(20, 80),
+            generate_type=PROPRECESS_TYPE,
         )
 
         # 训练特征提取模型
         train(data, labels, num_epochs=max(TEST_LIST))
 
-    else:
-        if RUN_FOR == "Classification":
-            print(
-                R"""
- ____  _____ _____    _      ____  ____  _____
-/   _\/    //__ __\  / \__/|/  _ \/  _ \/  __/
-|  /  |  __\  / \    | |\/||| / \|| | \||  \  
-|  \__| |     | |    | |  ||| \_/|| |_/||  /_ 
-\____/\_/     \_/    \_/  \|\____/\____/\____\
-"""
-            )
+    elif RUN_FOR == "Classification":
+        print_colored_text("分类模式", "32")
 
-            # 执行分类任务
-            test_classification(
-                file_path_enrol="./4307data/data_devs6_t800_1M_sf7_rev2_indoor_4k8.h5",
-                file_path_clf="./4307data/data_2025.2.26.h5",
-                dev_range_enrol=np.arange(0, 6, dtype=int),
-                pkt_range_enrol=np.arange(0, 800, dtype=int),
-                dev_range_clf=np.arange(0, 6, dtype=int),
-                pkt_range_clf=np.arange(000, 200, dtype=int),
-            )
+        # 执行分类任务
+        test_classification(
+            file_path_enrol="4307data/3.13tmp/DATA_all_dev_1~11_300times_433m_1M_3gain.h5",
+            file_path_clf="4307data/3.13tmp/DATA_lab2_dev_8_8_3_3_7_7_5_5_500times_433m_500k_70gain.h5",
+            dev_range_enrol=np.arange(0, 11, dtype=int),
+            pkt_range_enrol=np.arange(0, 300, dtype=int),
+            dev_range_clf=np.array([81,82,31,32,71,72,51,52])-1,
+            pkt_range_clf=np.arange(0, 500, dtype=int),
+        )
 
-        elif RUN_FOR == "Rogue Device Detection":
-            print(
-                R"""
- ____  ____  ____    _      ____  ____  _____
-/  __\/  _ \/  _ \  / \__/|/  _ \/  _ \/  __/
-|  \/|| | \|| | \|  | |\/||| / \|| | \||  \  
-|    /| |_/|| |_/|  | |  ||| \_/|| |_/||  /_ 
-\_/\_\\____/\____/  \_/  \|\____/\____/\____\
-"""
-            )
+    elif RUN_FOR == "Rogue Device Detection":
+        print_colored_text("甄别恶意模式", "32")
 
-            # 执行恶意设备检测任务
-            test_rogue_device_detection(
-                file_path_enrol="./dataset/Test/dataset_residential.h5",
-                dev_range_enrol=np.arange(30, 40, dtype=int),
-                pkt_range_enrol=np.arange(0, 100, dtype=int),
-                file_path_legitimate="./dataset/Test/dataset_residential.h5",
-                dev_range_legitimate=np.arange(30, 40, dtype=int),
-                pkt_range_legitimate=np.arange(100, 200, dtype=int),
-                file_path_rogue="./dataset/Test/dataset_rogue.h5",
-                dev_range_rogue=np.arange(40, 45, dtype=int),
-                pkt_range_rogue=np.arange(0, 100, dtype=int),
-            )
+        # 执行恶意设备检测任务
+        test_rogue_device_detection(
+            file_path_enrol="./dataset/Test/dataset_residential.h5",
+            dev_range_enrol=np.arange(30, 40, dtype=int),
+            pkt_range_enrol=np.arange(0, 100, dtype=int),
+            file_path_legitimate="./dataset/Test/dataset_residential.h5",
+            dev_range_legitimate=np.arange(30, 40, dtype=int),
+            pkt_range_legitimate=np.arange(100, 200, dtype=int),
+            file_path_rogue="./dataset/Test/dataset_rogue.h5",
+            dev_range_rogue=np.arange(40, 45, dtype=int),
+            pkt_range_rogue=np.arange(0, 100, dtype=int),
+        )
 
 
 def prepare_train_data(
     new_file_flag,
-    filename_train_prepare_data,
+    filename_train_prepared_data,
     path_train_original_data,
     dev_range,
     pkt_range,
     snr_range,
+    generate_type,
 ):
     """
     准备训练集
@@ -184,20 +169,16 @@ def prepare_train_data(
     """
     time_prepare_start = time.time()
     # 数据预处理
-    if not os.path.exists(filename_train_prepare_data) or new_file_flag == 1:
+    if not os.path.exists(filename_train_prepared_data) or new_file_flag == 1:
         # 需要新处理数据
         print("Data Converting...")
 
-        LoadDatasetObj = LoadDataset()
-        data, labels = LoadDatasetObj.load_iq_samples(
-            path_train_original_data, dev_range, pkt_range
-        )
+        data, labels = load_data(path_train_original_data, dev_range, pkt_range)
         data = awgn(data, snr_range)
-        TimeFrequencyTransformerObj = TimeFrequencyTransformer()
 
-        data = generate_spectrogram(data, TimeFrequencyTransformerObj)
+        data = generate_spectrogram(data, generate_type, WST_J, WST_Q)
 
-        with h5py.File(filename_train_prepare_data, "w") as f:
+        with h5py.File(filename_train_prepared_data, "w") as f:
             f.create_dataset("data", data=data)
             f.create_dataset("labels", data=labels)
         timeCost = time.time() - time_prepare_start
@@ -206,7 +187,7 @@ def prepare_train_data(
         # 处理数据已存在
         print("Data exist, loading...")
 
-        with h5py.File(filename_train_prepare_data, "r") as f:
+        with h5py.File(filename_train_prepared_data, "r") as f:
             data = f["data"][:]
             labels = f["labels"][:]
 
@@ -215,76 +196,25 @@ def prepare_train_data(
     return data, labels
 
 
-# 模型加载函数
-def load_model(file_path, weights_only=True):
-    """从指定路径加载模型"""
-    model = TripletNet(in_channels=1 if PROPRECESS_TYPE == 0 else 2)
-    model.load_state_dict(torch.load(file_path, weights_only=weights_only))
-    model.eval()
-    print(f"Model loaded from {file_path}")
-    return model
-
-
-# 数据预处理函数
-def generate_spectrogram(data, TF_Transformer: TimeFrequencyTransformer):
-    """
-    数据预处理方式选择
-
-    - PROPRECESS_TYPE : 0 信道独立的STFT
-    - PROPRECESS_TYPE : 1 小波散射变换
-    """
-
-    if PROPRECESS_TYPE == 0:
-        data = TF_Transformer.generate_stft_channel(data)
-    if PROPRECESS_TYPE == 1:
-        data = TF_Transformer.generate_WST(data, J=WST_J, Q=WST_Q)
-    return data
-
-
-# 部分数据加载 & 预处理函数
-def load_and_preprocess_data(
-    file_path,
-    dev_range,
-    pkt_range,
-    LoadDatasetObj: LoadDataset,
-    TimeFrequencyTransformerObj: TimeFrequencyTransformer,
-):
-    """加载 & 预处理数据"""
-    data, label = LoadDatasetObj.load_iq_samples(file_path, dev_range, pkt_range)
-    data = generate_spectrogram(data, TimeFrequencyTransformerObj)
-
-    # 准备三元组数据
-    triplet_data = [data, data, data]
-
-    # 将三元组输入转换为张量
-    triplet_data = [torch.tensor(x).float() for x in triplet_data]
-
-    return label, triplet_data
-
-
 # 数据准备与模型训练
 def train(data, labels, batch_size=32, num_epochs=200, learning_rate=1e-3):
     """
     准备数据并训练三元组网络模型。
 
-    参数:
-    data: 输入数据，通常为图像特征向量。
-    labels: 输入数据的标签。
-    dev_range: 设备范围，用于在数据集中选择特定范围的数据进行训练。
-    batch_size: 批处理大小，每次迭代训练的网络输入数量。
-    num_epochs: 训练的轮数（遍历整个数据集的次数）。
-    learning_rate: 学习率，控制优化器更新权重的步长。
-
-    返回:
-    models: 训练过程中保存的模型列表，包含每个关键轮次的模型副本。
-
     过程:
-    1. 将数据集划分为训练集和验证集。
-    2. 创建三元组数据集和数据加载器。
-    3. 初始化三元组网络模型、优化器和损失函数。
-    4. 在指定的设备（如GPU）上训练模型。
-    5. 在每个epoch结束时，记录损失并保存关键轮次的模型。
-    6. 训练结束后，绘制损失随epoch变化的图表。
+    1. 将数据集划分为训练集和验证集(尽管此函数只使用了训练集)。
+    2. 创建三元组数据集(TripletDataset)和数据加载器(DataLoader)。
+    3. 初始化三元组网络模型(TripletNet)、优化器(如Adam)和损失函数(如TripletLoss)。
+    4. 将模型移动到指定的设备(如GPU)上, 并设置模型为训练模式。
+    5. 在每个epoch中, 遍历数据加载器, 进行前向传播、计算损失、反向传播和优化步骤。
+    6. 记录每个epoch的损失, 并在指定的轮次(TEST_LIST)保存模型状态字典。
+    7. 在训练的最后几个轮次(TEST_LIST[-3:]), 绘制损失随epoch变化的图表并保存。
+
+    :param data: 输入数据, 通常为图像特征向量。
+    :param labels: 输入数据的标签。
+    :param batch_size (int): 批处理大小, 每次迭代训练的网络输入数量。默认为32。
+    :param num_epochs (int): 训练的轮数(遍历整个数据集的次数)。默认为200。
+    :param learning_rate (float): 学习率, 控制优化器更新权重的步长。默认为1e-3。
     """
 
     # 数据集划分
@@ -298,7 +228,7 @@ def train(data, labels, batch_size=32, num_epochs=200, learning_rate=1e-3):
     batch_num = math.ceil(len(train_dataset) / batch_size)
 
     # 初始化模型和优化器
-    model = TripletNet(in_channels=1 if PROPRECESS_TYPE == 0 else 2)
+    model = TripletNet(net_type=NET_TYPE, in_channels=1 if PROPRECESS_TYPE == 0 else 2)
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
     loss_fn = TripletLoss(margin=0.1)
 
@@ -315,10 +245,12 @@ def train(data, labels, batch_size=32, num_epochs=200, learning_rate=1e-3):
     )
     loss_per_epoch = []
 
+    # 总进度条
     with tqdm(total=num_epochs, desc="Total Progress") as total_bar:
         for epoch in range(num_epochs):
             start_time_ep = time.time()
             total_loss = 0.0
+            # 每一轮训练进度条
             with tqdm(total=batch_num, desc=f"Epoch {epoch}", leave=False) as pbar:
                 for batch_idx, (anchor, positive, negative) in enumerate(train_loader):
                     anchor, positive, negative = (
@@ -413,26 +345,18 @@ def test_classification(
     pkt_range_enrol,
     dev_range_clf,
     pkt_range_clf,
-):
+) -> None:
     """
-    使用给定的特征提取模型（从指定路径加载）对注册数据集和分类数据集进行分类测试，
-    采用K-NN和SVM分类器进行预测，并返回K-NN分类的预测标签、真实标签以及分类准确率。
-    同时，绘制K-NN和SVM分类的混淆矩阵热图。
+    * 使用给定的特征提取模型(从指定路径加载)对注册数据集和分类数据集进行分类测试。
 
-    参数:
-    file_path_enrol (str): 注册数据集的文件路径。
-    file_path_clf (str): 分类数据集的文件路径。
-    dev_range_enrol (tuple): 注册数据集中设备的范围（例如，设备ID的起始和结束值）。
-    pkt_range_enrol (tuple): 注册数据集中数据包的范围（例如，数据包的起始和结束索引）。
-    dev_range_clf (tuple): 分类数据集中设备的范围。
-    pkt_range_clf (tuple): 分类数据集中数据包的范围。
-
-    返回:
-    tuple: 包含三个元素的元组，分别是K-NN分类的预测标签（numpy.ndarray）、真实标签（numpy.ndarray）以及K-NN分类准确率（float）。
+    :param file_path_enrol (str): 注册数据集的文件路径。
+    :param file_path_clf (str): 分类数据集的文件路径。
+    :param dev_range_enrol (tuple): 注册数据集中设备的范围(例如, 设备ID的起始和结束值)。
+    :param pkt_range_enrol (tuple): 注册数据集中数据包的范围(例如, 数据包的起始和结束索引)。
+    :param dev_range_clf (tuple): 分类数据集中设备的范围。
+    :param pkt_range_clf (tuple): 分类数据集中数据包的范围。
     """
     # 加载数据
-    LoadDatasetObj = LoadDataset()
-    TF_TransformerObj = TimeFrequencyTransformer()
 
     vote_size = 10
     weight_knn = 0.5
@@ -442,32 +366,27 @@ def test_classification(
     提取设备特征
     """
 
-    # 加载注册数据集（IQ样本和标签）
+    # 加载注册数据集(IQ样本和标签)
     print("\nData loading...")
-    label_enrol, triplet_data_enrol = load_and_preprocess_data(
-        file_path_enrol,
-        dev_range_enrol,
-        pkt_range_enrol,
-        LoadDatasetObj,
-        TF_TransformerObj,
+    label_enrol, triplet_data_enrol = load_generate_triplet(
+        file_path_enrol, dev_range_enrol, pkt_range_enrol, PROPRECESS_TYPE
     )
 
-    # 加载分类数据集（IQ样本和标签）
+    # 加载分类数据集(IQ样本和标签)
 
-    label_clf, triplet_data_clf = load_and_preprocess_data(
-        file_path_clf,
-        dev_range_clf,
-        pkt_range_clf,
-        LoadDatasetObj,
-        TF_TransformerObj,
+    label_clf, triplet_data_clf = load_generate_triplet(
+        file_path_clf, dev_range_clf, pkt_range_clf, PROPRECESS_TYPE
     )
     print("\nData loaded!!!")
 
     for epoch in TEST_LIST:
         print()
         model = MODEL_DIR_PATH + f"Extractor_{epoch}.pth"
-        if os.path.exists(model):
-            model = load_model(model)
+        if not os.path.exists(model):
+            print(f"Extractor_{epoch}.pth isn't exist")
+        else:
+            model = load_model(model, NET_TYPE, PROPRECESS_TYPE)
+            print("Model loaded!!!")
 
             # 提取特征
             print("Feature extracting...")
@@ -554,7 +473,7 @@ def test_classification(
                 f"SVM accuracy\t\tw/\tvoting = {w_acc_svm * 100:.2f}%\n"
                 f"Combined accuracy\tw/\tweighted voting = {acc_combined * 100:.2f}%",
             )
-            print(f"Time cost: {timeCost:.3f}s")
+            print(f"Prediction time cost: {timeCost:.3f}s")
             print("-----------------------------")
             print()
 
@@ -607,8 +526,6 @@ def test_classification(
 
             # T-SNE 3D绘图
             # tsne_3d_plot(feature_clf[0],labels=label_clf)
-        else:
-            print(f"Extractor_{epoch}.pth isn't exist")
 
     return
 
@@ -626,24 +543,22 @@ def test_rogue_device_detection(
     pkt_range_rogue,
 ):
     """
-    该函数使用特征提取模型对恶意设备进行检测，并返回相关的检测结果和性能指标。
+    该函数使用特征提取模型对恶意设备进行检测, 并返回相关的检测结果和性能指标。
 
-    参数:
-    file_path_enrol (str): 注册数据集的路径。
-    dev_range_enrol (tuple): 注册数据集中设备的范围。
-    pkt_range_enrol (tuple): 注册数据集中数据包的范围。
-    file_path_legitimate (str): 合法设备数据集的路径。
-    dev_range_legitimate (tuple): 合法设备数据集中设备的范围。
-    pkt_range_legitimate (tuple): 合法设备数据集中数据包的范围。
-    file_path_rogue (str): 恶意设备数据集的路径。
-    dev_range_rogue (tuple): 恶意设备数据集中设备的范围。
-    pkt_range_rogue (tuple): 恶意设备数据集中数据包的范围。
+    :param file_path_enrol (str): 注册数据集的路径。
+    :param dev_range_enrol (tuple): 注册数据集中设备的范围。
+    :param pkt_range_enrol (tuple): 注册数据集中数据包的范围。
+    :param file_path_legitimate (str): 合法设备数据集的路径。
+    :param dev_range_legitimate (tuple): 合法设备数据集中设备的范围。
+    :param pkt_range_legitimate (tuple): 合法设备数据集中数据包的范围。
+    :param file_path_rogue (str): 恶意设备数据集的路径。
+    :param dev_range_rogue (tuple): 恶意设备数据集中设备的范围。
+    :param pkt_range_rogue (tuple): 恶意设备数据集中数据包的范围。
 
-    返回:
-    fpr (ndarray): 假阳性率。
-    tpr (ndarray): 真阳性率。
-    roc_auc (float): ROC 曲线下面积。
-    eer (float): 等错误率。
+    :return fpr (ndarray): 假阳性率。
+    :return tpr (ndarray): 真阳性率。
+    :return roc_auc (float): ROC 曲线下面积。
+    :return eer (float): 等错误率。
     """
 
     def _compute_eer(fpr, tpr, thresholds):
@@ -666,20 +581,13 @@ def test_rogue_device_detection(
         return eer, thresholds[min_index]
 
     # 加载和处理数据
-    LoadDatasetObj = LoadDataset()
-    TimeFrequencyTransformerObj = TimeFrequencyTransformer()
-
     """
     加载注册设备数据
     """
     print("\nDevice enrolling...")
-    # 加载注册数据集（IQ样本和标签）
-    label_enrol, triplet_data_enrol = load_and_preprocess_data(
-        file_path_enrol,
-        dev_range_enrol,
-        pkt_range_enrol,
-        LoadDatasetObj,
-        TimeFrequencyTransformerObj,
+    # 加载注册数据集(IQ样本和标签)
+    label_enrol, triplet_data_enrol = load_generate_triplet(
+        file_path_enrol, dev_range_enrol, pkt_range_enrol, PROPRECESS_TYPE
     )
 
     """
@@ -688,12 +596,10 @@ def test_rogue_device_detection(
 
     print("\nData loading...")
     # 加载合法设备和恶意设备数据
-    data_legitimate, _ = LoadDatasetObj.load_iq_samples(
+    data_legitimate, _ = load_data(
         file_path_legitimate, dev_range_legitimate, pkt_range_legitimate
     )
-    data_rogue, _ = LoadDatasetObj.load_iq_samples(
-        file_path_rogue, dev_range_rogue, pkt_range_rogue
-    )
+    data_rogue, _ = load_data(file_path_rogue, dev_range_rogue, pkt_range_rogue)
 
     # 合并合法设备和恶意设备数据
     data_test = np.concatenate([data_legitimate, data_rogue])
@@ -702,7 +608,7 @@ def test_rogue_device_detection(
     )
 
     # 提取特征
-    data_test = generate_spectrogram(data_test, TimeFrequencyTransformerObj)
+    data_test = generate_spectrogram(data_test, PROPRECESS_TYPE, WST_J, WST_Q)
 
     # 准备三元组数据
     triplet_data_test = [
@@ -719,8 +625,8 @@ def test_rogue_device_detection(
 
     for epoch in TEST_LIST:
         print()
-
-        model = load_model(MODEL_DIR_PATH + f"Extractor_{epoch}.pth")
+        model = MODEL_DIR_PATH + f"Extractor_{epoch}.pth"
+        model = load_model(model, NET_TYPE, PROPRECESS_TYPE)
 
         """
         设备注册
