@@ -130,7 +130,7 @@ def main():
         test_classification(
             file_path_enrol="4307data/3.13tmp/DATA_all_dev_1~11_300times_433m_1M_3gain.h5",
             file_path_clf="4307data/3.13tmp/DATA_lab2_dev_8_8_3_3_7_7_5_5_500times_433m_500k_70gain.h5",
-            dev_range_enrol=np.arange(0, 11, dtype=int),
+            dev_range_enrol=np.array(np.arange(0, 11, dtype=int)),
             pkt_range_enrol=np.arange(0, 300, dtype=int),
             dev_range_clf=np.array([81,82,31,32,71,72,51,52])-1,
             pkt_range_clf=np.arange(0, 500, dtype=int),
