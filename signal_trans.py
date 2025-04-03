@@ -37,7 +37,8 @@ def awgn(data, snr_range):
 class TimeFrequencyTransformer:
     """将时域信号转化为时频图，包括通道独立频谱图和小波散射频谱图的生成"""
 
-    def generate_stft_channel(self, data, win_len=256, overlap=128):
+    @staticmethod
+    def generate_stft_channel(data, win_len=256, overlap=128):
         """
         将一批IQ信号样本转换为通道独立频谱图。
 
@@ -87,6 +88,19 @@ class TimeFrequencyTransformer:
 
             # Take the logarithm of the magnitude.
             chan_ind_spec_amp = np.log10(np.abs(chan_ind_spec) ** 2)
+
+            """绘制结果，不要删除！！！"""
+            # plt.figure(figsize=(8, 8))
+            # plt.subplot(2, 1, 1)
+            # spec_amp = np.log10(np.abs(spec) ** 2)
+            # plt.imshow(spec_amp, aspect="auto")
+            # plt.title("STFT")
+            # plt.subplot(2, 1, 2)
+            # plt.imshow(chan_ind_spec_amp, aspect="auto")
+            # plt.title("Channel independent spectrogram")
+            # plt.tight_layout()
+            # plt.show()
+
             return chan_ind_spec_amp
 
         # Normalize the IQ samples.
@@ -106,9 +120,12 @@ class TimeFrequencyTransformer:
             chan_ind_spec_amp = _spec_crop(chan_ind_spec_amp)
             data_channel_ind_spec[i, 0, :, :] = chan_ind_spec_amp
 
+
+
         return data_channel_ind_spec
 
-    def generate_WST(self, data, J=6, Q=6):
+    @staticmethod
+    def generate_WST(data, J=6, Q=6):
         """
         将批量IQ样本转换为小波散射特征图。
 
@@ -158,22 +175,22 @@ class TimeFrequencyTransformer:
             # scatter_combined = np.log10(np.abs(scatter_combined) ** 2)
 
             """绘制结果，不要删除！！！"""
-            # for i in range(2):
-            #     plt.figure(figsize=(8, 8))
-            #     plt.subplot(3, 1, 1)
-            #     plt.plot(scatter_combined[i][order0][0])
-            #     plt.title("Zeroth-order scattering")
-            #     plt.subplot(3, 1, 2)
-            #     plt.imshow(scatter_combined[i][order1], aspect="auto")
-            #     plt.title("First-order scattering")
-            #     plt.subplot(3, 1, 3)
-            #     plt.imshow(scatter_combined[i][order2], aspect="auto")
-            #     plt.title("Second-order scattering")
-            #     plt.tight_layout()
-            #     print(
-            #         scatter_combined[i][order1].shape, scatter_combined[i][order2].shape
-            #     )
-            #     plt.show()
+            for i in range(2):
+                plt.figure(figsize=(8, 8))
+                plt.subplot(3, 1, 1)
+                plt.plot(scatter_combined[i][order0][0])
+                plt.title("Zeroth-order scattering")
+                plt.subplot(3, 1, 2)
+                plt.imshow(scatter_combined[i][order1], aspect="auto")
+                plt.title("First-order scattering")
+                plt.subplot(3, 1, 3)
+                plt.imshow(scatter_combined[i][order2], aspect="auto")
+                plt.title("Second-order scattering")
+                plt.tight_layout()
+                print(
+                    scatter_combined[i][order1].shape, scatter_combined[i][order2].shape
+                )
+                plt.show()
 
             scatter_combined = scatter_combined[:, order1]
             scatter_combined = scatter_combined[:, :, 1:] / scatter_combined[:, :, :-1]

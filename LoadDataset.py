@@ -5,11 +5,14 @@ import numpy as np
 
 
 class LoadDataset:
-    def __init__(self):
-        self.dataset_name = "data"
-        self.labelset_name = "label"
+    dataset_name = "data"
+    labelset_name = "label"
 
-    def _convert_to_complex(self, data):
+    def __init__(self):
+        pass
+
+    @classmethod
+    def _convert_to_complex(cls, data):
         """
         将加载的数据转换为复数IQ样本，不应用任何校准。
 
@@ -27,7 +30,8 @@ class LoadDataset:
         )
         return data_complex
 
-    def _convert_to_complex_with_calibration(self, data):
+    @classmethod
+    def _convert_to_complex_with_calibration(cls, data):
         """
         将加载的数据转换为复数IQ样本，并应用随机校准系数调整I和Q分量。
 
@@ -57,8 +61,9 @@ class LoadDataset:
         data_complex = tt1 + 1j * tt2
         return data_complex
 
+    @classmethod
     def load_iq_samples(
-        self,
+        cls,
         file_path: str,
         dev_range: list[int],
         pkt_range: list[int] = None,
@@ -66,6 +71,7 @@ class LoadDataset:
     ) -> tuple[np.ndarray, np.ndarray]:
         """
         从指定路径的数据集中加载IQ样本，并可选地应用校准。
+        必须先指定dev范围，再指定pkt范围
 
         参数:
             file_path (str): 数据集的路径。
@@ -80,33 +86,53 @@ class LoadDataset:
         """
         with h5py.File(file_path, "r") as f:
             # 加载标签并转换为从0开始的索引
-            label = f[self.labelset_name][:]
+            label = f[cls.labelset_name][:]
             label = label.astype(int).T - 1
+            devices = np.unique(label) if dev_range is None else np.asarray(dev_range)
 
-            if pkt_range is not None:  # 如果指定了读取范围/数量
-                # 根据设备和数据包范围构建样本索引列表
-                sample_index_list = []
-                for dev_idx in dev_range:
-                    # 注意：这里假设pkt_range可以是一个列表或一个slice对象
-                    sample_index_dev = np.where(label == dev_idx)[0][pkt_range].tolist()
-                    sample_index_list.extend(sample_index_dev)
-                # print(label)
+            sample_index_list = []
+            for dev in devices:
+                # 获取当前设备的所有数据包全局索引
+                device_indices = np.where(label == dev)[0]
 
-                # 加载数据并根据需要应用校准
-                data = f[self.dataset_name][sample_index_list]
-                label = label[sample_index_list]
-            else:  # 没有指定就全读
-                data = f[self.dataset_name][:]
+                if pkt_range is not None:
+                    # 直接应用 pkt_range 作为索引数组
+                    # 通过掩码过滤越界索引（避免错误）
+                    valid_mask = pkt_range < len(device_indices)
+                    valid_pkt = pkt_range[valid_mask]
+                    selected_indices = device_indices[valid_pkt]
+                else:
+                    selected_indices = device_indices
+
+                sample_index_list.extend(selected_indices.tolist())
+
+            # 加载数据并根据需要应用校准
+            data = f[cls.dataset_name][sample_index_list]
+            label = label[sample_index_list]
+            # else:  # 没有指定就全读
+            #     data = f[cls.dataset_name][:]
 
             # 是否应用校准到IQ样本上
             if calibration:
-                data = self._convert_to_complex_with_calibration(data)
+                data = cls._convert_to_complex_with_calibration(data)
             else:
-                data = self._convert_to_complex(data)
+                data = cls._convert_to_complex(data)
 
             # 打印数据集信息
-            num_pkt = data.shape[0] // dev_range.shape[0]
-            print(
-                f"Dataset information: Devs: {{{str(dev_range)[1:-1]}}}, {num_pkt} packets per device."
-            )
+            has_dev_range = np.unique(label)
+            num_pkt = data.shape[0] // len(has_dev_range)
+            print("Dataset information:")
+            if len(has_dev_range) < 10:
+                print(
+                    f"Devs: {{{','.join(map(str,list(has_dev_range)))}}}",
+                )
+            else:
+                print(
+                    "Devs: {",
+                    ",".join(map(str, list(has_dev_range)[:3])),
+                    "...",
+                    ",".join(map(str, list(has_dev_range)[-3:])),
+                    "}",
+                )
+            print(f"Packets count per device: {num_pkt}")
         return data, label

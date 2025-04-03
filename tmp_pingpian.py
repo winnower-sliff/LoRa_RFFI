@@ -17,8 +17,8 @@ calibration = False
 
 
 with h5py.File(file_path, "r") as f:
-    LoadDatasetobj = LoadDataset()
-    data, labels = LoadDatasetobj.load_iq_samples(file_path, dev_range)
+    # LoadDatasetobj = LoadDataset()
+    data, labels = LoadDataset.load_iq_samples(file_path, dev_range)
     num_pkt = data.shape[0] // dev_range.shape[0]
     # 计算频偏
     F_dream = 433.125 * 10**6

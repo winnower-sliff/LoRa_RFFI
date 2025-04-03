@@ -23,18 +23,18 @@ def generate_spectrogram(data, generate_type, wst_j=6, wst_q=6):
     - PROPRECESS_TYPE : 0 信道独立的STFT
     - PROPRECESS_TYPE : 1 小波散射变换
     """
-    TF_Transformer = TimeFrequencyTransformer()
+    # TF_Transformer = TimeFrequencyTransformer()
     if generate_type == 0:
-        data = TF_Transformer.generate_stft_channel(data)
+        data = TimeFrequencyTransformer.generate_stft_channel(data)
     if generate_type == 1:
-        data = TF_Transformer.generate_WST(data, J=wst_j, Q=wst_q)
+        data = TimeFrequencyTransformer.generate_WST(data, J=wst_j, Q=wst_q)
     return data
 
 
 def load_data(file_path, dev_range, pkt_range) -> tuple[np.ndarray, np.ndarray]:
     """根据参数加载指定数据"""
-    LoadDatasetObj = LoadDataset()
-    data, label = LoadDatasetObj.load_iq_samples(file_path, dev_range, pkt_range)
+    # LoadDatasetObj = LoadDataset()
+    data, label = LoadDataset.load_iq_samples(file_path, dev_range, pkt_range)
 
     return data, label
 
@@ -51,33 +51,3 @@ def load_generate_triplet(file_path, dev_range, pkt_range, generate_type):
 
     return label, triplet_data
 
-
-def print_colored_text(text, color_code):
-    """
-    在终端中打印彩色文本。
-
-    :param text: 要打印的文本。
-    :param color_code: ANSI转义序列中的颜色代码（不包括开头的或\x1b[和结尾的m）。
-
-    以下是一些常用的ANSI转义序列，用于设置文本颜色：
-
-    * 重置/默认: 0
-    * 黑色: 30
-    * 红色: 31
-    * 绿色: 32
-    * 黄色: 33
-    * 蓝色: 34
-    * 洋红/紫色: 35
-    * 青色: 36
-    * 白色: 37
-    """
-    # 构建完整的ANSI转义序列
-    color_sequence = f"\033[{color_code}m"
-    # 使用print()函数输出彩色文本，并在末尾重置颜色
-    print(f"{color_sequence}{text}\033[0m")
-
-
-if __name__ == "__main__":
-    print("颜色对应列表：")
-    for i in range(30, 40):
-        print_colored_text(f"123\t{i}", str(i))

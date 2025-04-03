@@ -22,13 +22,8 @@ from net.TripletNet import TripletNet
 from signal_trans import awgn
 
 from TSNE import tsne_3d_plot
-from utils import (
-    generate_spectrogram,
-    load_data,
-    load_generate_triplet,
-    load_model,
-    print_colored_text,
-)
+from utils import generate_spectrogram, load_data, load_generate_triplet, load_model
+from better_print import TextAnimator, print_colored_text
 
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -44,7 +39,7 @@ def main():
     # 0 for stft, 1 for wst
     PROPRECESS_TYPE = 0
     # "Train" / "Classification" / "Rogue Device Detection"
-    mode_type = 1
+    mode_type = 0
     # 我们需要一个新的训练文件吗？
     new_file_flag = 1
 
@@ -113,9 +108,9 @@ def main():
         data, labels = prepare_train_data(
             new_file_flag,
             filename_train_prepared_data,
-            path_train_original_data="./dataset/Train/dataset_training_aug.h5",
-            dev_range=np.arange(0, 30, dtype=int),
-            pkt_range=np.arange(0, 1000, dtype=int),
+            path_train_original_data="4307data/DATA_shen_tx1-40_pktN800_433m_1M_10gain.h5",
+            dev_range=np.arange(0, 40, dtype=int),
+            pkt_range=np.arange(0, 800, dtype=int),
             snr_range=np.arange(20, 80),
             generate_type=PROPRECESS_TYPE,
         )
@@ -128,12 +123,22 @@ def main():
 
         # 执行分类任务
         test_classification(
+<<<<<<< HEAD
+            file_path_enrol="dataset/Train/dataset_training_aug.h5",
+            file_path_clf="4307data/DATA_rx1_tx1-20_pktN800_433m_1M_10gain.h5",
+            dev_range_enrol=np.array(np.arange(0, 30, dtype=int)),
+            dev_range_clf=np.array(np.arange(0, 20, dtype=int)),
+            # dev_range_clf=np.array([1, 2, 3, 4, 5, 6]) - 1,
+            pkt_range_enrol=np.arange(0, 800, dtype=int),
+            pkt_range_clf=np.arange(600, 800, dtype=int),
+=======
             file_path_enrol="4307data/3.13tmp/DATA_all_dev_1~11_300times_433m_1M_3gain.h5",
             file_path_clf="4307data/3.13tmp/DATA_lab2_dev_8_8_3_3_7_7_5_5_500times_433m_500k_70gain.h5",
-            dev_range_enrol=np.array(np.arange(0, 11, dtype=int)),
+            dev_range_enrol=np.arange(0, 11, dtype=int),
             pkt_range_enrol=np.arange(0, 300, dtype=int),
             dev_range_clf=np.array([81,82,31,32,71,72,51,52])-1,
             pkt_range_clf=np.arange(0, 500, dtype=int),
+>>>>>>> parent of 80d5130 (优化代码逻辑)
         )
 
     elif RUN_FOR == "Rogue Device Detection":
@@ -341,10 +346,10 @@ def train(data, labels, batch_size=32, num_epochs=200, learning_rate=1e-3):
 def test_classification(
     file_path_enrol,
     file_path_clf,
-    dev_range_enrol,
-    pkt_range_enrol,
-    dev_range_clf,
-    pkt_range_clf,
+    dev_range_enrol: list[int] = None,
+    dev_range_clf: list[int] = None,
+    pkt_range_enrol: list[int] = None,
+    pkt_range_clf: list[int] = None,
 ) -> None:
     """
     * 使用给定的特征提取模型(从指定路径加载)对注册数据集和分类数据集进行分类测试。
@@ -381,6 +386,7 @@ def test_classification(
 
     for epoch in TEST_LIST:
         print()
+        print("=============================")
         model = MODEL_DIR_PATH + f"Extractor_{epoch}.pth"
         if not os.path.exists(model):
             print(f"Extractor_{epoch}.pth isn't exist")
@@ -389,79 +395,88 @@ def test_classification(
             print("Model loaded!!!")
 
             # 提取特征
-            print("Feature extracting...")
-            with torch.no_grad():
-                feature_enrol = model(*triplet_data_enrol)
+            # print("Feature extracting...")
+            try:
+                text = TextAnimator("Feature extracting", "Feature extracted")
+                text.start()
+                with torch.no_grad():
+                    feature_enrol = model(*triplet_data_enrol)
 
-            # 使用 K-NN 分类器进行训练
-            knnclf = KNeighborsClassifier(n_neighbors=100, metric="euclidean")
-            knnclf.fit(feature_enrol[0], label_enrol.ravel())
+                # 使用 K-NN 分类器进行训练
+                knnclf = KNeighborsClassifier(n_neighbors=100, metric="euclidean")
+                knnclf.fit(feature_enrol[0], label_enrol.ravel())
 
-            svmclf = SVC(kernel="rbf", C=1.0)  # 可以根据需要调整参数
-            svmclf.fit(feature_enrol[0], label_enrol.ravel())
+                svmclf = SVC(kernel="rbf", C=1.0)  # 可以根据需要调整参数
+                svmclf.fit(feature_enrol[0], label_enrol.ravel())
+            finally:
+                text.stop()
 
             """
             进行预测
             """
 
-            print("Device predicting...")
-            clf_start_time = time.time()
-            # dev_range_clf = dev_range_clf[dev_range_clf != 39]
+            # print("Device predicting...")
+            try:
+                text = TextAnimator("Device predicting", "Device prediction finish")
+                text.start()
 
-            # 提取分类数据集的特征
-            with torch.no_grad():
-                feature_clf = model(*triplet_data_clf)
+                # dev_range_clf = dev_range_clf[dev_range_clf != 39]
 
-            # K-NN和SVM的初步预测
-            pred_label_knn_wo = knnclf.predict(feature_clf[0])
-            pred_label_svm_wo = svmclf.predict(feature_clf[0])
+                # 提取分类数据集的特征
+                with torch.no_grad():
+                    feature_clf = model(*triplet_data_clf)
 
-            # K-NN投票机制
-            pred_label_knn_w_v = []
-            for i in range(len(pred_label_knn_wo)):
-                window_start = max(0, i - vote_size // 2)
-                window_end = min(len(pred_label_knn_wo), i + vote_size // 2 + 1)
-                window_knn = pred_label_knn_wo[window_start:window_end]
-                most_common_label_knn = Counter(window_knn).most_common(1)[0][0]
-                pred_label_knn_w_v.append(most_common_label_knn)
+                # K-NN和SVM的初步预测
+                pred_label_knn_wo = knnclf.predict(feature_clf[0])
+                pred_label_svm_wo = svmclf.predict(feature_clf[0])
 
-            # SVM投票机制
-            pred_label_svm_w_v = []
-            for i in range(len(pred_label_svm_wo)):
-                window_start = max(0, i - vote_size // 2)
-                window_end = min(len(pred_label_svm_wo), i + vote_size // 2 + 1)
-                window_svm = pred_label_svm_wo[window_start:window_end]
-                most_common_label_svm = Counter(window_svm).most_common(1)[0][0]
-                pred_label_svm_w_v.append(most_common_label_svm)
+                # K-NN投票机制
+                pred_label_knn_w_v = []
+                for i in range(len(pred_label_knn_wo)):
+                    window_start = max(0, i - vote_size // 2)
+                    window_end = min(len(pred_label_knn_wo), i + vote_size // 2 + 1)
+                    window_knn = pred_label_knn_wo[window_start:window_end]
+                    most_common_label_knn = Counter(window_knn).most_common(1)[0][0]
+                    pred_label_knn_w_v.append(most_common_label_knn)
 
-            # 综合投票机制
-            combined_label = []
-            for i in range(0, len(pred_label_knn_w_v), vote_size):
-                window_end = min(i + vote_size, len(pred_label_knn_w_v))
+                # SVM投票机制
+                pred_label_svm_w_v = []
+                for i in range(len(pred_label_svm_wo)):
+                    window_start = max(0, i - vote_size // 2)
+                    window_end = min(len(pred_label_svm_wo), i + vote_size // 2 + 1)
+                    window_svm = pred_label_svm_wo[window_start:window_end]
+                    most_common_label_svm = Counter(window_svm).most_common(1)[0][0]
+                    pred_label_svm_w_v.append(most_common_label_svm)
 
-                knn_votes = Counter()
-                svm_votes = Counter()
+                # 综合投票机制
+                combined_label = []
+                for i in range(0, len(pred_label_knn_w_v), vote_size):
+                    window_end = min(i + vote_size, len(pred_label_knn_w_v))
 
-                for j in range(i, window_end):
-                    knn_votes[pred_label_knn_w_v[j]] += weight_knn
-                    svm_votes[pred_label_svm_w_v[j]] += weight_svm
-                combined_votes = knn_votes + svm_votes
-                final_label = combined_votes.most_common(1)[0][0]
+                    knn_votes = Counter()
+                    svm_votes = Counter()
 
-                # 保持与原样本相同的长度
-                combined_label.extend([final_label] * (window_end - i))
+                    for j in range(i, window_end):
+                        knn_votes[pred_label_knn_w_v[j]] += weight_knn
+                        svm_votes[pred_label_svm_w_v[j]] += weight_svm
+                    combined_votes = knn_votes + svm_votes
+                    final_label = combined_votes.most_common(1)[0][0]
 
-            # 计算各分类器的准确率
-            wo_acc_knn = accuracy_score(label_clf, pred_label_knn_wo)
-            wo_acc_svm = accuracy_score(label_clf, pred_label_svm_wo)
-            w_acc_knn = accuracy_score(label_clf, pred_label_knn_w_v)
-            w_acc_svm = accuracy_score(label_clf, pred_label_svm_w_v)
-            acc_combined = accuracy_score(label_clf, combined_label)
-            wo_accs = [wo_acc_knn, wo_acc_svm]
-            w_accs = [w_acc_knn, w_acc_svm, acc_combined]
-            wwo_accs = [wo_accs, w_accs]
+                    # 保持与原样本相同的长度
+                    combined_label.extend([final_label] * (window_end - i))
 
-            timeCost = time.time() - clf_start_time
+                # 计算各分类器的准确率
+                wo_acc_knn = accuracy_score(label_clf, pred_label_knn_wo)
+                wo_acc_svm = accuracy_score(label_clf, pred_label_svm_wo)
+                w_acc_knn = accuracy_score(label_clf, pred_label_knn_w_v)
+                w_acc_svm = accuracy_score(label_clf, pred_label_svm_w_v)
+                acc_combined = accuracy_score(label_clf, combined_label)
+                wo_accs = [wo_acc_knn, wo_acc_svm]
+                w_accs = [w_acc_knn, w_acc_svm, acc_combined]
+                wwo_accs = [wo_accs, w_accs]
+
+            finally:
+                text.stop()
 
             print("-----------------------------")
             print(f"Extractor ID: {epoch}")
@@ -473,13 +488,12 @@ def test_classification(
                 f"SVM accuracy\t\tw/\tvoting = {w_acc_svm * 100:.2f}%\n"
                 f"Combined accuracy\tw/\tweighted voting = {acc_combined * 100:.2f}%",
             )
-            print(f"Prediction time cost: {timeCost:.3f}s")
             print("-----------------------------")
             print()
 
             # 绘制混淆矩阵
-            conf_mat_knn_wo = confusion_matrix(label_clf, pred_label_knn_w_v)
-            conf_mat_svm_wo = confusion_matrix(label_clf, pred_label_svm_w_v)
+            conf_mat_knn_wo = confusion_matrix(label_clf, pred_label_knn_wo)
+            conf_mat_svm_wo = confusion_matrix(label_clf, pred_label_svm_wo)
             conf_mat_knn_w = confusion_matrix(label_clf, pred_label_knn_w_v)
             conf_mat_svm_w = confusion_matrix(label_clf, pred_label_svm_w_v)
             conf_mat_combined = confusion_matrix(label_clf, combined_label)
@@ -487,12 +501,14 @@ def test_classification(
             w_cms = [conf_mat_knn_w, conf_mat_svm_w, conf_mat_combined]
             wwo_cms = [wo_cms, w_cms]
 
-            fig, axs = plt.subplots(2, 3, figsize=(20, 12))
+            # fig, axs = plt.subplots(2, 3, figsize=(20, 12))
+            fig, axs = plt.subplots(2, 2, figsize=(12, 12))
             types = ["KNN", "SVM", "Combined"]
             wwo = ["w/o", "w/"]
 
             for i in range(2):
-                for j in range(2 if i == 0 else 3):
+                # for j in range(2 if i == 0 else 3):
+                for j in range(2 if i == 0 else 2):
                     sns.heatmap(
                         wwo_cms[i][j],
                         annot=True,
@@ -509,10 +525,10 @@ def test_classification(
                     axs[i][j].set_ylabel("True label")
 
             # 删除第一行第三个子图
-            fig.delaxes(axs[0, 2])
+            # fig.delaxes(axs[0, 2])
             fig.suptitle(
                 f"Heatmap Comparison After {epoch} Epochs \
-                    net type: {NET_NAME}, pps: {PPS_FOR}, Vote Size: {vote_size}, ",
+                    net type: {NET_NAME}, pps: {PPS_FOR}, Vote Size: {vote_size}",
                 fontsize=16,
             )
 
@@ -521,11 +537,12 @@ def test_classification(
                 os.makedirs(MODEL_DIR_PATH + dir_name)
             pic_save_path = MODEL_DIR_PATH + dir_name + f"cft_{epoch}.png"
             plt.savefig(pic_save_path)
-            print(f"save place: {pic_save_path}")
+            print(f"Png save path: {pic_save_path}")
             # plt.show()
 
             # T-SNE 3D绘图
             # tsne_3d_plot(feature_clf[0],labels=label_clf)
+        print("=============================")
 
     return
 
