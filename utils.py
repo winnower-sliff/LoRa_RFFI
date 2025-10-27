@@ -11,7 +11,7 @@ def load_model(file_path, net_type, generate_type, weights_only=True):
     model = TripletNet(net_type=net_type, in_channels=1 if generate_type == 0 else 2)
     model.load_state_dict(torch.load(file_path, weights_only=weights_only))
     model.eval()
-    print(f"Model loaded from {file_path}")
+    # print(f"Model loaded from {file_path}")
     return model
 
 
@@ -38,6 +38,16 @@ def load_data(file_path, dev_range, pkt_range) -> tuple[np.ndarray, np.ndarray]:
 
     return data, label
 
+# 数据预处理
+def load_generate(file_path, dev_range, pkt_range, generate_type):
+    """加载 & 预处理"""
+    data, label = load_data(file_path, dev_range, pkt_range)
+    data = generate_spectrogram(data, generate_type)
+
+    # 数据三元组化并转换为张量类型
+    data = [torch.tensor(data).float() ]
+
+    return label, data
 
 # 数据预处理
 def load_generate_triplet(file_path, dev_range, pkt_range, generate_type):

@@ -123,22 +123,12 @@ def main():
 
         # 执行分类任务
         test_classification(
-<<<<<<< HEAD
-            file_path_enrol="dataset/Train/dataset_training_aug.h5",
-            file_path_clf="4307data/DATA_rx1_tx1-20_pktN800_433m_1M_10gain.h5",
-            dev_range_enrol=np.array(np.arange(0, 30, dtype=int)),
-            dev_range_clf=np.array(np.arange(0, 20, dtype=int)),
-            # dev_range_clf=np.array([1, 2, 3, 4, 5, 6]) - 1,
-            pkt_range_enrol=np.arange(0, 800, dtype=int),
-            pkt_range_clf=np.arange(600, 800, dtype=int),
-=======
             file_path_enrol="4307data/3.13tmp/DATA_all_dev_1~11_300times_433m_1M_3gain.h5",
             file_path_clf="4307data/3.13tmp/DATA_lab2_dev_8_8_3_3_7_7_5_5_500times_433m_500k_70gain.h5",
             dev_range_enrol=np.arange(0, 11, dtype=int),
             pkt_range_enrol=np.arange(0, 300, dtype=int),
             dev_range_clf=np.array([81,82,31,32,71,72,51,52])-1,
             pkt_range_clf=np.arange(0, 500, dtype=int),
->>>>>>> parent of 80d5130 (优化代码逻辑)
         )
 
     elif RUN_FOR == "Rogue Device Detection":

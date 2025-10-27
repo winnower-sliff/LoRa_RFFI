@@ -3,6 +3,7 @@ from matplotlib import pyplot as plt
 from numpy.random import standard_normal, uniform
 import h5py
 import numpy as np
+import csv
 
 from LoadDataset import LoadDataset
 
@@ -10,9 +11,12 @@ from LoadDataset import LoadDataset
 dataset_name = "data"
 labelset_name = "label"
 
-file_path = "./4307data/data_2025.2.17.h5"
+file_path =r"D:\SLF\LoRa_RFFI\4307data\DATA_rx1_tx1-20_pktN900_433m_1M_5gain.h5"
 
-dev_range, pkt_range = np.arange(0, 6, dtype=int), np.arange(000, 200, dtype=int)
+output_file = "centroid_frequencies.csv"
+
+#dev_range, pkt_range = np.arange(0, 6, dtype=int), np.arange(000, 200, dtype=int)
+dev_range, pkt_range = np.arange(0, 20, dtype=int), np.arange(000, 800, dtype=int)
 calibration = False
 
 
@@ -58,7 +62,6 @@ with h5py.File(file_path, "r") as f:
                 plt.show()
         devs_cents.append(cents)
 
-
     # 绘制频谱
     if 1 == 1:
         # 创建一个颜色列表，确保每个设备有不同的颜色
@@ -78,3 +81,17 @@ with h5py.File(file_path, "r") as f:
 
         # 显示图形
         plt.show()
+
+
+    # 新增代码：保存到CSV文件
+with open(output_file, 'w', newline='') as csvfile:
+    writer = csv.writer(csvfile)
+    # 写入表头
+    writer.writerow(['Device', 'Packet Index', 'Centroid Frequency (Hz)'])
+    # 遍历每个设备和对应的质心列表
+    for dev_index, cents in enumerate(devs_cents):
+        for pkt_index, cent in enumerate(cents):
+            writer.writerow([dev_index, pkt_index, cent])
+
+print(f"数据已保存到 {output_file}")
+    

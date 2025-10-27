@@ -85,6 +85,7 @@ class TimeFrequencyTransformer:
 
             # Generate channel independent spectrogram.
             chan_ind_spec = spec[:, 1:] / spec[:, :-1]
+            # chan_ind_spec = spec
 
             # Take the logarithm of the magnitude.
             chan_ind_spec_amp = np.log10(np.abs(chan_ind_spec) ** 2)
@@ -93,11 +94,15 @@ class TimeFrequencyTransformer:
             # plt.figure(figsize=(8, 8))
             # plt.subplot(2, 1, 1)
             # spec_amp = np.log10(np.abs(spec) ** 2)
-            # plt.imshow(spec_amp, aspect="auto")
-            # plt.title("STFT")
+            # plt.imshow(spec_amp, aspect="auto",origin='lower')
+            # plt.title("(a)")
+            # # plt.title("STFT")
+            # plt.axis('off')  # 隐藏坐标轴
             # plt.subplot(2, 1, 2)
-            # plt.imshow(chan_ind_spec_amp, aspect="auto")
-            # plt.title("Channel independent spectrogram")
+            # plt.imshow(chan_ind_spec_amp, aspect="auto",origin='lower')
+            # plt.title("(b)")
+            # # plt.title("Channel independent spectrogram")
+            # plt.axis('off')  # 隐藏坐标轴
             # plt.tight_layout()
             # plt.show()
 
@@ -119,8 +124,6 @@ class TimeFrequencyTransformer:
             )
             chan_ind_spec_amp = _spec_crop(chan_ind_spec_amp)
             data_channel_ind_spec[i, 0, :, :] = chan_ind_spec_amp
-
-
 
         return data_channel_ind_spec
 
@@ -169,39 +172,29 @@ class TimeFrequencyTransformer:
 
             # # 将实部和虚部结果组合（例如计算幅度）
             scatter_combined = np.stack((scatter_real, scatter_imag), axis=0)
-            # scatter_combined = scatter_combined[:, s:e]
-            # # Generate channel independent spectrogram.
-            # scatter_combined = scatter_combined[:, :, 1:] / scatter_combined[:, :, :-1]
-            # scatter_combined = np.log10(np.abs(scatter_combined) ** 2)
 
             """绘制结果，不要删除！！！"""
-            for i in range(2):
-                plt.figure(figsize=(8, 8))
-                plt.subplot(3, 1, 1)
-                plt.plot(scatter_combined[i][order0][0])
-                plt.title("Zeroth-order scattering")
-                plt.subplot(3, 1, 2)
-                plt.imshow(scatter_combined[i][order1], aspect="auto")
-                plt.title("First-order scattering")
-                plt.subplot(3, 1, 3)
-                plt.imshow(scatter_combined[i][order2], aspect="auto")
-                plt.title("Second-order scattering")
-                plt.tight_layout()
-                print(
-                    scatter_combined[i][order1].shape, scatter_combined[i][order2].shape
-                )
-                plt.show()
-
-            scatter_combined = scatter_combined[:, order1]
-            scatter_combined = scatter_combined[:, :, 1:] / scatter_combined[:, :, :-1]
-
             # for i in range(2):
-            #     plt.figure()
-
-            #     plt.imshow(scatter_combined[i], aspect="auto")
+            #     plt.figure(figsize=(8, 8))
+            #     plt.subplot(3, 1, 1)
+            #     plt.plot(scatter_combined[i][order0][0])
+            #     plt.title("Zeroth-order scattering")
+            #     plt.subplot(3, 1, 2)
+            #     plt.imshow(scatter_combined[i][order1], aspect="auto")
             #     plt.title("First-order scattering")
-
+            #     plt.subplot(3, 1, 3)
+            #     plt.imshow(scatter_combined[i][order2], aspect="auto")
+            #     plt.title("Second-order scattering")
+            #     plt.tight_layout()
+            #     print(
+            #         scatter_combined[i][order1].shape, scatter_combined[i][order2].shape
+            #     )
             #     plt.show()
+
+            # 只传入第一阶WST结果
+            scatter_combined = scatter_combined[:, order1]
+            # scatter_combined = scatter_combined[:, :, 1:] / scatter_combined[:, :, :-1]
+
             # 存储结果
             data_wav_spec[i] = scatter_combined
         return data_wav_spec
