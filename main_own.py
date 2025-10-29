@@ -30,7 +30,14 @@ from better_print import TextAnimator, print_colored_text
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
-def main():
+# 定义运行模式的枚举
+class Mode:
+    TRAIN = "train"
+    CLASSIFICATION = "classification"
+    ROGUE_DEVICE_DETECTION = "rogue_device_detection"
+
+
+def main(mode=Mode.TRAIN):
     """基础设置"""
     global NET_TYPE, PROPRECESS_TYPE, TEST_LIST, NET_NAME, PPS_FOR, MODEL_DIR_PATH, WST_J, WST_Q
 
@@ -39,8 +46,6 @@ def main():
     NET_TYPE = 1
     # 0 for stft, 1 for wst
     PROPRECESS_TYPE = 0
-    # "Train" / "Classification" / "Rogue Device Detection"
-    mode_type = 0
     # 我们需要一个新的训练文件吗？
     new_file_flag = 1
 
@@ -50,31 +55,8 @@ def main():
     WST_J = 6
     WST_Q = 6
 
-    parser = argparse.ArgumentParser(description="参数设置")
-    parser.add_argument("-n", "--net", type=int, help="net_type", default=NET_TYPE)
-    parser.add_argument(
-        "-p", "--proprecess", type=int, help="proprecess", default=PROPRECESS_TYPE
-    )
-    parser.add_argument("-m", "--mode", type=int, help="mode_type", default=mode_type)
-    parser.add_argument(
-        "-f", "--new_file", type=int, help="NEW_FILE_FLAG", default=new_file_flag
-    )
-    parser.add_argument("-j", "--wst_j", type=int, help="NEW_FILE_FLAG", default=WST_J)
-    parser.add_argument("-q", "--wst_q", type=int, help="NEW_FILE_FLAG", default=WST_Q)
-
-    args = parser.parse_args()
-    NET_TYPE, PROPRECESS_TYPE, mode_type, new_file_flag, WST_J, WST_Q = (
-        args.net,
-        args.proprecess,
-        args.mode,
-        args.new_file,
-        args.wst_j,
-        args.wst_q,
-    )
-
-    print(args)
-    # print("Press Enter to continue...")
-    # input()  # 等待用户按下Enter键
+    # 移除命令行参数解析，保留默认值
+    print(f"Running mode: {mode}")
 
     """后续设置"""
 
@@ -95,58 +77,80 @@ def main():
     if not os.path.exists(MODEL_DIR_PATH):
         os.makedirs(MODEL_DIR_PATH)
 
-    mode_class = ["Train", "Classification", "Rogue Device Detection"]
-    RUN_FOR = mode_class[int(mode_type)]
-
     print(f"Net DIRNAME: {MODEL_DIR_PATH}")
 
-    if RUN_FOR == "Train":
-        # 训练模式
-        print_colored_text("训练模式", "32")
+    # 使用字典映射替代 if-elif-else 结构
+    mode_functions = {
+        Mode.TRAIN: run_train_mode,
+        Mode.CLASSIFICATION: run_classification_mode,
+        Mode.ROGUE_DEVICE_DETECTION: run_rogue_device_detection_mode
+    }
 
-        print(f"Convert Type: {PPS_FOR}")
-
-        data, labels = prepare_train_data(
+    # 执行对应模式的函数
+    if mode in mode_functions:
+        mode_functions[mode](
             new_file_flag,
             filename_train_prepared_data,
-            path_train_original_data="4307data/DATA_shen_tx1-40_pktN800_433m_1M_10gain.h5",
-            dev_range=np.arange(0, 40, dtype=int),
-            pkt_range=np.arange(0, 800, dtype=int),
-            snr_range=np.arange(20, 80),
-            generate_type=PROPRECESS_TYPE,
+            NET_TYPE,
+            PROPRECESS_TYPE,
+            TEST_LIST,
+            WST_J,
+            WST_Q
         )
+    else:
+        raise ValueError(f"Unknown mode: {mode}")
 
-        # 训练特征提取模型
-        train(data, labels, num_epochs=max(TEST_LIST))
 
-    elif RUN_FOR == "Classification":
-        print_colored_text("分类模式", "32")
+def run_train_mode(new_file_flag, filename_train_prepared_data, net_type, preprocess_type, test_list, wst_j, wst_q):
+    """训练模式"""
+    print_colored_text("训练模式", "32")
+    print(f"Convert Type: {PPS_FOR}")
 
-        # 执行分类任务
-        test_classification(
-            file_path_enrol="4307data/3.13tmp/DATA_all_dev_1~11_300times_433m_1M_3gain.h5",
-            file_path_clf="4307data/3.13tmp/DATA_lab2_dev_8_8_3_3_7_7_5_5_500times_433m_500k_70gain.h5",
-            dev_range_enrol=np.arange(0, 11, dtype=int),
-            pkt_range_enrol=np.arange(0, 300, dtype=int),
-            dev_range_clf=np.array([81,82,31,32,71,72,51,52])-1,
-            pkt_range_clf=np.arange(0, 500, dtype=int),
-        )
+    data, labels = prepare_train_data(
+        new_file_flag,
+        filename_train_prepared_data,
+        path_train_original_data="4307data/DATA_shen_tx1-40_pktN800_433m_1M_10gain.h5",
+        dev_range=np.arange(0, 40, dtype=int),
+        pkt_range=np.arange(0, 800, dtype=int),
+        snr_range=np.arange(20, 80),
+        generate_type=preprocess_type,
+    )
 
-    elif RUN_FOR == "Rogue Device Detection":
-        print_colored_text("甄别恶意模式", "32")
+    # 训练特征提取模型
+    train(data, labels, num_epochs=max(test_list))
 
-        # 执行恶意设备检测任务
-        test_rogue_device_detection(
-            file_path_enrol="./dataset/Test/dataset_residential.h5",
-            dev_range_enrol=np.arange(30, 40, dtype=int),
-            pkt_range_enrol=np.arange(0, 100, dtype=int),
-            file_path_legitimate="./dataset/Test/dataset_residential.h5",
-            dev_range_legitimate=np.arange(30, 40, dtype=int),
-            pkt_range_legitimate=np.arange(100, 200, dtype=int),
-            file_path_rogue="./dataset/Test/dataset_rogue.h5",
-            dev_range_rogue=np.arange(40, 45, dtype=int),
-            pkt_range_rogue=np.arange(0, 100, dtype=int),
-        )
+
+def run_classification_mode(new_file_flag, filename_train_prepared_data, net_type, preprocess_type, test_list, wst_j, wst_q):
+    """分类模式"""
+    print_colored_text("分类模式", "32")
+
+    # 执行分类任务
+    test_classification(
+        file_path_enrol="4307data/3.13tmp/DATA_all_dev_1~11_300times_433m_1M_3gain.h5",
+        file_path_clf="4307data/3.13tmp/DATA_lab2_dev_8_8_3_3_7_7_5_5_500times_433m_500k_70gain.h5",
+        dev_range_enrol=np.arange(0, 11, dtype=int),
+        pkt_range_enrol=np.arange(0, 300, dtype=int),
+        dev_range_clf=np.array([81,82,31,32,71,72,51,52])-1,
+        pkt_range_clf=np.arange(0, 500, dtype=int),
+    )
+
+
+def run_rogue_device_detection_mode(new_file_flag, filename_train_prepared_data, net_type, preprocess_type, test_list, wst_j, wst_q):
+    """甄别恶意模式"""
+    print_colored_text("甄别恶意模式", "32")
+
+    # 执行恶意设备检测任务
+    test_rogue_device_detection(
+        file_path_enrol="./dataset/Test/dataset_residential.h5",
+        dev_range_enrol=np.arange(30, 40, dtype=int),
+        pkt_range_enrol=np.arange(0, 100, dtype=int),
+        file_path_legitimate="./dataset/Test/dataset_residential.h5",
+        dev_range_legitimate=np.arange(30, 40, dtype=int),
+        pkt_range_legitimate=np.arange(100, 200, dtype=int),
+        file_path_rogue="./dataset/Test/dataset_rogue.h5",
+        dev_range_rogue=np.arange(40, 45, dtype=int),
+        pkt_range_rogue=np.arange(0, 100, dtype=int),
+    )
 
 
 def prepare_train_data(
@@ -687,4 +691,6 @@ def test_rogue_device_detection(
 
 # In[] 主程序执行逻辑
 if __name__ == "__main__":
-    main()
+    # 可以通过修改这里的参数来选择运行模式:
+    # Mode.TRAIN, Mode.CLASSIFICATION, Mode.ROGUE_DEVICE_DETECTION
+    main(Mode.TRAIN)
