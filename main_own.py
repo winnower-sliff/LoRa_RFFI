@@ -19,12 +19,12 @@ from tqdm import tqdm
 
 from training_utils.TripletDataset import TripletDataset, TripletLoss
 from net.TripletNet import TripletNet
-from signal_trans import awgn
+from utils.signal_trans import awgn
 
-from TSNE import tsne_3d_plot
+from utils.TSNE import tsne_3d_plot
 from training_utils.data_preprocessor import generate_spectrogram, load_data, load_generate_triplet
 from training_utils.model_utils import load_model
-from better_print import TextAnimator, print_colored_text
+from utils.better_print import TextAnimator, print_colored_text
 
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
