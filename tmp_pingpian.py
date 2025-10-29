@@ -5,7 +5,7 @@ import h5py
 import numpy as np
 import csv
 
-from LoadDataset import LoadDataset
+from training_utils.data_loader import LoadDataset
 
 
 dataset_name = "data"

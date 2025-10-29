@@ -2,7 +2,7 @@
 import torch
 import torch.nn as nn
 
-from TripletDataset import TripletLoss
+from training_utils.TripletDataset import TripletLoss
 from net.net_DRSN import drsnet18, drsnet34
 from net.net_original import FeatureExtractor
 
@@ -23,7 +23,8 @@ class TripletNet(nn.Module):
         return embedded_anchor, embedded_positive, embedded_negative
 
     def triplet_loss(self, anchor, positive, negative):
-        return TripletLoss.apply(anchor, positive, negative, self.margin)
+        loss_fn = TripletLoss(margin=self.margin)
+        return loss_fn(anchor, positive, negative)
 
     def predict(self, anchor):
         with torch.no_grad():

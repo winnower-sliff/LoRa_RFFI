@@ -1,21 +1,11 @@
-# 模型加载函数
+# 数据预处理函数
 import numpy as np
 import torch
-from LoadDataset import LoadDataset
-from net.TripletNet import TripletNet
-from signal_trans import TimeFrequencyTransformer
+from training_utils.data_loader import LoadDataset
+from utils.signal_trans import TimeFrequencyTransformer
+from utils.signal_trans import TimeFrequencyTransformer
 
 
-def load_model(file_path, net_type, generate_type, weights_only=True):
-    """从指定路径加载模型"""
-    model = TripletNet(net_type=net_type, in_channels=1 if generate_type == 0 else 2)
-    model.load_state_dict(torch.load(file_path, weights_only=weights_only))
-    model.eval()
-    # print(f"Model loaded from {file_path}")
-    return model
-
-
-# 数据预处理函数
 def generate_spectrogram(data, generate_type, wst_j=6, wst_q=6):
     """
     数据预处理方式选择
@@ -38,6 +28,7 @@ def load_data(file_path, dev_range, pkt_range) -> tuple[np.ndarray, np.ndarray]:
 
     return data, label
 
+
 # 数据预处理
 def load_generate(file_path, dev_range, pkt_range, generate_type):
     """加载 & 预处理"""
@@ -48,6 +39,7 @@ def load_generate(file_path, dev_range, pkt_range, generate_type):
     data = [torch.tensor(data).float() ]
 
     return label, data
+
 
 # 数据预处理
 def load_generate_triplet(file_path, dev_range, pkt_range, generate_type):
@@ -60,4 +52,3 @@ def load_generate_triplet(file_path, dev_range, pkt_range, generate_type):
     triplet_data = [torch.tensor(x).float() for x in triplet_data]
 
     return label, triplet_data
-

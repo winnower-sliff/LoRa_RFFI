@@ -17,12 +17,13 @@ from sklearn.neighbors import KNeighborsClassifier
 from sklearn.metrics import confusion_matrix, accuracy_score, roc_curve, auc
 from tqdm import tqdm
 
-from TripletDataset import TripletDataset, TripletLoss
+from training_utils.TripletDataset import TripletDataset, TripletLoss
 from net.TripletNet import TripletNet
 from signal_trans import awgn
 
 from TSNE import tsne_3d_plot
-from utils import generate_spectrogram, load_data, load_generate_triplet, load_model
+from training_utils.data_preprocessor import generate_spectrogram, load_data, load_generate_triplet
+from training_utils.model_utils import load_model
 from better_print import TextAnimator, print_colored_text
 
 
