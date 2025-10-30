@@ -3,7 +3,6 @@ import numpy as np
 import torch
 from training_utils.data_loader import LoadDataset
 from utils.signal_trans import TimeFrequencyTransformer
-from utils.signal_trans import TimeFrequencyTransformer
 
 
 def generate_spectrogram(data, generate_type, wst_j=6, wst_q=6):
