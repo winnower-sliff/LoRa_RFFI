@@ -1,8 +1,14 @@
 # 数据预处理函数
+import os
+import time
+
+import h5py
 import numpy as np
 import torch
+
+from net.TripletNet import TripletNet
 from training_utils.data_loader import LoadDataset
-from utils.signal_trans import TimeFrequencyTransformer
+from utils.signal_trans import TimeFrequencyTransformer, awgn
 
 
 def generate_spectrogram(data, generate_type, wst_j=6, wst_q=6):
@@ -51,3 +57,55 @@ def load_generate_triplet(file_path, dev_range, pkt_range, generate_type):
     triplet_data = [torch.tensor(x).float() for x in triplet_data]
 
     return label, triplet_data
+
+def prepare_train_data(
+        new_file_flag,
+        filename_train_prepared_data,
+        path_train_original_data,
+        dev_range,
+        pkt_range,
+        snr_range,
+        generate_type,
+        WST_J,
+        WST_Q,
+):
+    """
+    准备训练集
+
+    根据选择的信号处理类型生成对应的训练集
+    """
+    time_prepare_start = time.time()
+    # 数据预处理
+    if not os.path.exists(filename_train_prepared_data) or new_file_flag == 1:
+        # 需要新处理数据
+        print("Data Converting...")
+
+        data, labels = load_data(path_train_original_data, dev_range, pkt_range)
+        data = awgn(data, snr_range)
+
+        data = generate_spectrogram(data, generate_type, WST_J, WST_Q)
+
+        with h5py.File(filename_train_prepared_data, "w") as f:
+            f.create_dataset("data", data=data)
+            f.create_dataset("labels", data=labels)
+        timeCost = time.time() - time_prepare_start
+        print(f"Convert Time Cost: {timeCost:.3f}s")
+    else:
+        # 处理数据已存在
+        print("Data exist, loading...")
+
+        with h5py.File(filename_train_prepared_data, "r") as f:
+            data = f["data"][:]
+            labels = f["labels"][:]
+
+        timeCost = time.time() - time_prepare_start
+        print(f"Load Time Cost: {timeCost:.3f}s")
+    return data, labels
+
+def load_model(file_path, net_type, generate_type, weights_only=True):
+    """从指定路径加载模型"""
+    model = TripletNet(net_type=net_type, in_channels=1 if generate_type == 0 else 2)
+    model.load_state_dict(torch.load(file_path, weights_only=weights_only))
+    model.eval()
+    print(f"Model loaded from {file_path}")
+    return model

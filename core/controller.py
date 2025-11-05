@@ -42,13 +42,13 @@ def run_train_mode(config):
     data, labels = prepare_train_data(
         config.new_file_flag,
         config.filename_train_prepared_data,
-        path_train_original_data="4307data/DATA_shen_tx1-40_pktN800_433m_1M_10gain.h5",
+        path_train_original_data="dataset/Train/dataset_training_aug.h5",
         dev_range=np.arange(0, 40, dtype=int),
         pkt_range=np.arange(0, 800, dtype=int),
         snr_range=np.arange(20, 80),
         generate_type=config.PROPRECESS_TYPE,
-        wst_j=config.WST_J,
-        wst_q=config.WST_Q,
+        WST_J=config.WST_J,
+        WST_Q=config.WST_Q,
     )
 
     # 训练特征提取模型

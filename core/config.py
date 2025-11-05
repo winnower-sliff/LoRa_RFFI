@@ -32,9 +32,9 @@ class Config:
     def __init__(self):
         # 不要 net_0 & pps_1
         # 0 for origin, 1 for drsn
-        self.NET_TYPE = NetworkType.WAVELET
+        self.NET_TYPE = NetworkType.WAVELET.value
         # 0 for stft, 1 for wst
-        self.PROPRECESS_TYPE = PreprocessType.STFT
+        self.PROPRECESS_TYPE = PreprocessType.STFT.value
         # 我们需要一个新的训练文件吗？
         self.new_file_flag = 1
 
@@ -43,12 +43,12 @@ class Config:
         self.WST_Q = 6
 
         # 后续设置
-        if self.NET_TYPE == NetworkType.ORIGINAL:
+        if self.NET_TYPE == NetworkType.ORIGINAL.value:
             self.NET_NAME = "origin"
-        elif self.NET_TYPE == NetworkType.WAVELET:
+        elif self.NET_TYPE == NetworkType.WAVELET.value:
             self.NET_NAME = "drsn"
 
-        if self.PROPRECESS_TYPE == PreprocessType.STFT:
+        if self.PROPRECESS_TYPE == PreprocessType.STFT.value:
             self.PPS_FOR = "stft"
             self.MODEL_DIR_PATH = f"./model/{self.PPS_FOR}/{self.NET_NAME}/"
             self.filename_train_prepared_data = f"train_data_{self.PPS_FOR}.h5"
