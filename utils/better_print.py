@@ -30,11 +30,12 @@ class TextAnimator:
         end_time = time.time()
         cost_time = end_time - start_time
 
+        pad = ' ' * max(2, 30 - len(self.__text_finish))
+        if len(self.__text_finish) >= 30:
+            pad = '\n' + ' ' * 30
         print(
-            f"\r{self.__text_finish}{\
-                " "*max(2,30-len(self.__text_finish)) if len(self.__text_finish)<30 else '\n'+' '*30\
-                    }Cost Time: {cost_time:5.2f}s\033[K"
-        )  # \033[K 清除行尾
+            f"\r{self.__text_finish}{pad}Cost Time: {cost_time:5.2f}s\033[K"
+        )
 
     def start(self, text_run: str):
         """启动动画线程（支持多次调用）"""
