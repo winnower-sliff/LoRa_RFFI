@@ -4,30 +4,60 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="8d0acb0b-396f-43ce-9d11-ab82addef2ee" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/.idea/LoRa_RFFI.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/LoRa_RFFI.iml" afterDir="false" />
+    <list default="true" id="8d0acb0b-396f-43ce-9d11-ab82addef2ee" name="Changes" comment="init: 初始化剪枝相关函数">
+      <change afterPath="$PROJECT_DIR$/modes/prune_mode.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/net/net_prune.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/config.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/config.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/core/controller.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/controller.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/main.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/net/TripletNet.py" beforeDir="false" afterPath="$PROJECT_DIR$/net/TripletNet.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/pruning/automatic_pruner.py" beforeDir="false" afterPath="$PROJECT_DIR$/pruning/automatic_prunner.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/pruning/pruning_results/rank_gen.py" beforeDir="false" afterPath="$PROJECT_DIR$/pruning/rank_gen.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/pruning/ranker_pruner.py" beforeDir="false" afterPath="$PROJECT_DIR$/pruning/ranker_prunner.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/training_modes/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/modes/__init__.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/training_modes/classification_mode.py" beforeDir="false" afterPath="$PROJECT_DIR$/modes/classification_mode.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/training_modes/config.py" beforeDir="false" afterPath="$PROJECT_DIR$/modes/config.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/training_modes/rogue_device_detection_mode.py" beforeDir="false" afterPath="$PROJECT_DIR$/modes/rogue_device_detection_mode.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/training_modes/train_mode.py" beforeDir="false" afterPath="$PROJECT_DIR$/modes/train_mode.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/training_utils/data_preprocessor.py" beforeDir="false" afterPath="$PROJECT_DIR$/training_utils/data_preprocessor.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
     <option name="LAST_RESOLUTION" value="IGNORE" />
   </component>
+  <component name="FileTemplateManagerImpl">
+    <option name="RECENT_TEMPLATES">
+      <list>
+        <option value="Python Script" />
+      </list>
+    </option>
+  </component>
   <component name="Git.Settings">
+    <option name="RECENT_BRANCH_BY_REPOSITORY">
+      <map>
+        <entry key="$PROJECT_DIR$" value="BaseLine" />
+      </map>
+    </option>
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
   </component>
-  <component name="GitHubPullRequestSearchHistory"><![CDATA[{
-  "lastFilter": {
-    "state": "OPEN",
-    "assignee": "mokiarec"
+  <component name="GitHubPullRequestSearchHistory">{
+  &quot;lastFilter&quot;: {
+    &quot;state&quot;: &quot;OPEN&quot;,
+    &quot;assignee&quot;: &quot;mokiarec&quot;
   }
-}]]></component>
-  <component name="GithubPullRequestsUISettings"><![CDATA[{
-  "selectedUrlAndAccountId": {
-    "url": "git@github.com:mokiarec/LoRa_RFFI.git",
-    "accountId": "73dd3c2a-d699-4993-a2b4-e54bf02f7a13"
+}</component>
+  <component name="GithubPullRequestsUISettings">{
+  &quot;selectedUrlAndAccountId&quot;: {
+    &quot;url&quot;: &quot;git@github.com:mokiarec/LoRa_RFFI.git&quot;,
+    &quot;accountId&quot;: &quot;73dd3c2a-d699-4993-a2b4-e54bf02f7a13&quot;
   }
-}]]></component>
+}</component>
+  <component name="ProblemsViewState">
+    <option name="selectedTabId" value="CurrentFile" />
+  </component>
   <component name="ProjectColorInfo">{
   &quot;customColor&quot;: &quot;&quot;,
   &quot;associatedIndex&quot;: 7
@@ -39,11 +69,21 @@
   </component>
   <component name="PropertiesComponent"><![CDATA[{
   "keyToString": {
+    "Python 测试.Python 测试 (pruning_mode.py 内).executor": "Run",
+    "Python 测试.Python 测试 (ranker_pruner.py 内).executor": "Run",
+    "Python.TripletNet.executor": "Run",
+    "Python.automatic_pruner.executor": "Run",
+    "Python.controller.executor": "Run",
+    "Python.main.executor": "Run",
+    "Python.rank_gen.executor": "Run",
+    "Python.ranker_pruner.executor": "Run",
+    "Python.ranker_prunner.executor": "Run",
+    "Python.scratch_3.executor": "Run",
     "RunOnceActivity.OpenProjectViewOnStart": "true",
     "RunOnceActivity.ShowReadmeOnStart": "true",
     "RunOnceActivity.git.unshallow": "true",
     "WebServerToolWindowFactoryState": "true",
-    "git-widget-placeholder": "main",
+    "git-widget-placeholder": "Pruning",
     "ignore.virus.scanning.warn.message": "true",
     "last_opened_file_path": "F:/MyDocument/A竞赛科研项目/UAV_code",
     "node.js.detected.package.eslint": "true",
@@ -53,8 +93,18 @@
     "nodejs_package_manager_path": "npm",
     "settings.editor.selected.configurable": "com.jetbrains.python.configuration.PyActiveSdkModuleConfigurable",
     "vue.rearranger.settings.migration": "true"
+  },
+  "keyToStringList": {
+    "com.intellij.ide.scratch.ScratchImplUtil$2/新建临时文件": [
+      "Python"
+    ]
   }
 }]]></component>
+  <component name="RecentsManager">
+    <key name="MoveFile.RECENT_KEYS">
+      <recent name="F:\MyDocument\A竞赛科研项目\LoRa_RFFI\pruning" />
+    </key>
+  </component>
   <component name="SharedIndexes">
     <attachedChunks>
       <set>
@@ -72,8 +122,27 @@
       <option name="presentableId" value="Default" />
       <updated>1677596309072</updated>
       <workItem from="1677596310375" duration="12000" />
-      <workItem from="1762318515602" duration="304000" />
+      <workItem from="1762318515602" duration="5323000" />
+      <workItem from="1762333932489" duration="17780000" />
+      <workItem from="1762396216088" duration="38821000" />
     </task>
+    <task id="LOCAL-00001" summary="fix: 修复代码不能启动的问题, 补全代码">
+      <option name="closed" value="true" />
+      <created>1762326311221</created>
+      <option name="number" value="00001" />
+      <option name="presentableId" value="LOCAL-00001" />
+      <option name="project" value="LOCAL" />
+      <updated>1762326311222</updated>
+    </task>
+    <task id="LOCAL-00002" summary="init: 初始化剪枝相关函数">
+      <option name="closed" value="true" />
+      <created>1762357883596</created>
+      <option name="number" value="00002" />
+      <option name="presentableId" value="LOCAL-00002" />
+      <option name="project" value="LOCAL" />
+      <updated>1762357883596</updated>
+    </task>
+    <option name="localTasksCounter" value="3" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -84,10 +153,43 @@
       <map>
         <entry key="MAIN">
           <value>
-            <State />
+            <State>
+              <option name="CUSTOM_BOOLEAN_PROPERTIES">
+                <map>
+                  <entry key="Show.Git.Branches" value="true" />
+                </map>
+              </option>
+              <option name="FILTERS">
+                <map>
+                  <entry key="branch">
+                    <value>
+                      <list>
+                        <option value="Pruning" />
+                      </list>
+                    </value>
+                  </entry>
+                </map>
+              </option>
+            </State>
           </value>
         </entry>
       </map>
     </option>
+  </component>
+  <component name="VcsManagerConfiguration">
+    <MESSAGE value="fix: 修复代码不能启动的问题, 补全代码" />
+    <MESSAGE value="init: 初始化剪枝相关函数" />
+    <option name="LAST_COMMIT_MESSAGE" value="init: 初始化剪枝相关函数" />
+  </component>
+  <component name="com.intellij.coverage.CoverageDataManagerImpl">
+    <SUITE FILE_PATH="coverage/LoRa_RFFI$ranker_pruner.coverage" NAME="ranker_pruner 覆盖结果" MODIFIED="1762356887596" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/pruning" />
+    <SUITE FILE_PATH="coverage/LoRa_RFFI$TripletNet.coverage" NAME="TripletNet 覆盖结果" MODIFIED="1762325428478" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/net" />
+    <SUITE FILE_PATH="coverage/LoRa_RFFI$main.coverage" NAME="main 覆盖结果" MODIFIED="1762436688389" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+    <SUITE FILE_PATH="coverage/LoRa_RFFI$automatic_pruner.coverage" NAME="automatic_pruner 覆盖结果" MODIFIED="1762356132954" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/pruning" />
+    <SUITE FILE_PATH="coverage/LoRa_RFFI$rank_gen.coverage" NAME="rank_gen 覆盖结果" MODIFIED="1762357866509" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/pruning/pruning_results" />
+    <SUITE FILE_PATH="coverage/LoRa_RFFI$.coverage" NAME=" 覆盖结果" MODIFIED="1762359081301" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/training_modes" />
+    <SUITE FILE_PATH="coverage/LoRa_RFFI$controller.coverage" NAME="controller 覆盖结果" MODIFIED="1762325656213" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/core" />
+    <SUITE FILE_PATH="coverage/LoRa_RFFI$scratch_3.coverage" NAME="scratch_3 覆盖结果" MODIFIED="1762334258000" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$APPLICATION_CONFIG_DIR$/scratches" />
+    <SUITE FILE_PATH="coverage/LoRa_RFFI$ranker_prunner.coverage" NAME="ranker_prunner 覆盖结果" MODIFIED="1762433331184" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/pruning" />
   </component>
 </project>

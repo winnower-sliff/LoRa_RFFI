@@ -13,12 +13,14 @@ class Mode:
     TRAIN = "train"
     CLASSIFICATION = "classification"
     ROGUE_DEVICE_DETECTION = "rogue_device_detection"
+    PRUNING = "pruning"
 
 
 # 定义网络类型枚举
 class NetworkType(Enum):
     ORIGINAL = 0      # 原始网络
     WAVELET = 1       # 小波变换网络
+    PRUNE = 2         # 剪枝模型
 
 
 # 定义预处理类型枚举
@@ -27,12 +29,18 @@ class PreprocessType(Enum):
     WST = 1           # 小波散射变换
 
 
+# 定义剪枝类型枚举
+class PruneType(str, Enum):
+    l2 = "l2"
+    fpgm = "fpgm"
+
+
 # 配置类，用于存储全局配置参数
 class Config:
     def __init__(self):
         # 不要 net_0 & pps_1
-        # 0 for origin, 1 for drsn
-        self.NET_TYPE = NetworkType.WAVELET.value
+        # 0 for origin, 1 for drsn, 2 for prune
+        self.NET_TYPE = NetworkType.PRUNE.value
         # 0 for stft, 1 for wst
         self.PROPRECESS_TYPE = PreprocessType.STFT.value
         # 我们需要一个新的训练文件吗？
@@ -42,11 +50,17 @@ class Config:
         self.WST_J = 6
         self.WST_Q = 6
 
+        # 剪枝相关的配置
+        self.pruned_output_dir = "./pruning_results/"
+        self.custom_pruning_file = os.path.join(self.pruned_output_dir, "1-pr.csv")
+
         # 后续设置
         if self.NET_TYPE == NetworkType.ORIGINAL.value:
             self.NET_NAME = "origin"
         elif self.NET_TYPE == NetworkType.WAVELET.value:
             self.NET_NAME = "drsn"
+        elif self.NET_TYPE == NetworkType.PRUNE.value:
+            self.NET_NAME = "prune"
 
         if self.PROPRECESS_TYPE == PreprocessType.STFT.value:
             self.PPS_FOR = "stft"

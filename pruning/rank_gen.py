@@ -4,16 +4,15 @@ Author: Mabon Manoj
 用于生成模型的滤波器排名，支持L2范数和FPGM方法
 """
 
-import os
-import sys
 import argparse
+import sys
 from pathlib import Path
-from typing import List, Dict, Tuple, Optional, Union
+from typing import List, Dict, Tuple, Union
+
 import numpy as np
 import pandas as pd
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 from scipy.spatial import distance
 from scipy.stats import entropy
 
@@ -355,24 +354,45 @@ class RankGenerator:
         print(f"FPGM排名文件已保存到: {output_dir}")
         return results, idx_results
 
-    def load_model(self, model_path: Path) -> nn.Module:
+    def load_model(self, model_path: Path, model_class: nn.Module = None) -> nn.Module:
         """
         加载PyTorch模型
 
         参数:
             model_path: 模型路径
+            model_class: 模型类 (如果保存的是state_dict)
 
         返回:
             model: 加载的模型
         """
         try:
-            # 尝试加载完整模型
-            model = torch.load(model_path, map_location=self.device, weights_only=False)
-            if isinstance(model, nn.Module):
-                return model
+            # 首先尝试加载完整模型
+            checkpoint = torch.load(model_path, map_location=self.device, weights_only=False)
+
+            if isinstance(checkpoint, nn.Module):
+                # 加载的是完整模型
+                print("加载的是完整模型")
+                model = checkpoint
+                print("✓ 加载完整模型")
+            elif isinstance(checkpoint, dict):
+                # 加载的是state_dict
+                if model_class is None:
+                    raise ValueError("模型保存为state_dict格式，需要提供model_class参数")
+
+                # 创建模型实例并加载state_dict
+                model = model_class()
+                if 'state_dict' in checkpoint:
+                    model.load_state_dict(checkpoint['state_dict'])
+                else:
+                    model.load_state_dict(checkpoint)
+                print("✓ 从state_dict加载模型")
             else:
-                # 如果是state_dict，需要知道模型结构
-                raise ValueError("需要提供模型类来加载state_dict")
+                raise ValueError(f"未知的模型格式: {type(checkpoint)}")
+
+            model.to(self.device)
+            model.eval()
+            return model
+
         except Exception as e:
             print(f"加载模型失败: {e}")
             raise
@@ -469,12 +489,10 @@ def main():
         sys.exit(1)
 
 
-# 集成到现有框架的便捷函数
+# 生成模型排名
 def generate_model_ranks(model_path: Union[str, Path], output_dir: Union[str, Path] = "rank_results",
                         method: str = "l2", config: Config = None) -> bool:
     """
-    便捷函数：生成模型排名
-
     参数:
         model_path: 模型路径
         output_dir: 输出目录
@@ -490,123 +508,3 @@ def generate_model_ranks(model_path: Union[str, Path], output_dir: Union[str, Pa
         output_dir=Path(output_dir),
         method=method
     )
-
-
-def create_simple_test_model():
-    """创建简单的测试模型"""
-    class SimpleTestModel(nn.Module):
-        def __init__(self):
-            super().__init__()
-            self.conv1 = nn.Conv2d(1, 8, 3)  # 简单卷积层
-            self.conv2 = nn.Conv2d(8, 16, 3)
-            self.fc = nn.Linear(16 * 6 * 6, 10)  # 假设输入为 28x28
-
-        def forward(self, x):
-            x = torch.relu(self.conv1(x))
-            x = torch.relu(self.conv2(x))
-            x = x.view(x.size(0), -1)
-            x = self.fc(x)
-            return x
-
-    return SimpleTestModel()
-
-
-def demo_rank_generation():
-    """演示排名生成功能"""
-    print("=== 排名生成演示 ===")
-
-    # 创建和保存测试模型
-    model = create_simple_test_model()
-    model_path = Path("demo_model.pth")
-
-    # 保存模型状态字典而不是完整模型
-    torch.save(model.state_dict(), model_path)
-    print(f"创建演示模型: {model_path}")
-
-    # 由于我们保存的是state_dict，需要创建新的模型实例来加载
-    loaded_model = create_simple_test_model()
-    loaded_model.load_state_dict(torch.load(model_path))
-    torch.save(loaded_model, model_path)  # 现在保存完整模型
-
-    # 生成排名
-    rank_gen = RankGenerator()
-
-    print("\n1. 使用L2方法生成排名...")
-    success_l2 = rank_gen.generate_ranks(
-        model_path=model_path,
-        output_dir=Path("demo_l2_results"),
-        method="l2"
-    )
-
-    if success_l2:
-        print("\n2. 使用FPGM方法生成排名...")
-        success_fpgm = rank_gen.generate_ranks(
-            model_path=model_path,
-            output_dir=Path("demo_fpgm_results"),
-            method="fpgm"
-        )
-    else:
-        success_fpgm = False
-
-    # 清理
-    if model_path.exists():
-        model_path.unlink()
-
-    # 清理演示目录
-    import shutil
-    for demo_dir in ["demo_l2_results", "demo_fpgm_results"]:
-        if Path(demo_dir).exists():
-            shutil.rmtree(demo_dir)
-
-    if success_l2 and success_fpgm:
-        print("\n✓ 演示完成!")
-        return True
-    else:
-        print("\n✗ 演示失败!")
-        return False
-
-
-def quick_demo():
-    """快速演示"""
-    print("=== 快速演示排名生成 ===")
-
-    # 直接使用DemoModel类
-    model = DemoModel()
-    model_path = Path("quick_demo_model.pth")
-
-    # 保存模型
-    torch.save(model, model_path)
-    print(f"创建演示模型: {model_path}")
-
-    # 生成排名
-    rank_gen = RankGenerator()
-
-    success = rank_gen.generate_ranks(
-        model_path=model_path,
-        output_dir=Path("quick_demo_results"),
-        method="l2"
-    )
-
-    # 清理
-    if model_path.exists():
-        model_path.unlink()
-
-    import shutil
-    if Path("quick_demo_results").exists():
-        shutil.rmtree("quick_demo_results")
-
-    if success:
-        print("✓ 快速演示完成!")
-    else:
-        print("✗ 快速演示失败!")
-
-    return success
-
-
-if __name__ == '__main__':
-    # 如果没有命令行参数，运行快速演示
-    if len(sys.argv) == 1:
-        print("未提供命令行参数，运行快速演示...")
-        quick_demo()
-    else:
-        main()

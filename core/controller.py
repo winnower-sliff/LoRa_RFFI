@@ -1,15 +1,13 @@
 import numpy as np
-import torch
-
-from utils.better_print import TextAnimator, print_colored_text
-from training_utils.data_preprocessor import prepare_train_data
-from training_modes.train_mode import train
-from training_modes.classification_mode import test_classification
-from training_modes.rogue_device_detection_mode import test_rogue_device_detection
-
 
 # 从配置模块导入配置、设备和模式枚举
-from core.config import Config, DEVICE, Mode
+from core.config import Config, Mode
+from modes.classification_mode import test_classification
+from modes.prune_mode import pruning
+from modes.rogue_device_detection_mode import test_rogue_device_detection
+from modes.train_mode import train
+from training_utils.data_preprocessor import prepare_train_data
+from utils.better_print import print_colored_text
 
 
 def main(mode=Mode.TRAIN):
@@ -25,6 +23,7 @@ def main(mode=Mode.TRAIN):
         Mode.TRAIN: run_train_mode,
         Mode.CLASSIFICATION: run_classification_mode,
         Mode.ROGUE_DEVICE_DETECTION: run_rogue_device_detection_mode,
+        Mode.PRUNING: run_pruning_mode,
     }
 
     # 执行对应模式的函数
@@ -69,12 +68,12 @@ def run_classification_mode(config):
 
     # 执行分类任务
     test_classification(
-        file_path_enrol="4307data/3.13tmp/DATA_all_dev_1~11_300times_433m_1M_3gain.h5",
-        file_path_clf="4307data/3.13tmp/DATA_lab2_dev_8_8_3_3_7_7_5_5_500times_433m_500k_70gain.h5",
-        dev_range_enrol=np.arange(0, 11, dtype=int),
-        pkt_range_enrol=np.arange(0, 300, dtype=int),
-        dev_range_clf=np.array([81, 82, 31, 32, 71, 72, 51, 52]) - 1,
-        pkt_range_clf=np.arange(0, 500, dtype=int),
+        file_path_enrol="dataset/Train/dataset_training_no_aug.h5",
+        file_path_clf="dataset/Test/dataset_seen_devices.h5 ",
+        dev_range_enrol=np.arange(10, 20, dtype=int),
+        pkt_range_enrol=np.arange(0, 200, dtype=int),
+        dev_range_clf=np.arange(10, 20, dtype=int),
+        pkt_range_clf=np.arange(0, 200, dtype=int),
         net_type=config.NET_TYPE,
         preprocess_type=config.PROPRECESS_TYPE,
         test_list=config.TEST_LIST,
@@ -107,4 +106,30 @@ def run_rogue_device_detection_mode(config):
         model_dir_path=config.MODEL_DIR_PATH,
         wst_j=config.WST_J,
         wst_q=config.WST_Q,
+    )
+
+def run_pruning_mode(config):
+    """剪枝模式"""
+    print_colored_text("剪枝模式", "32")
+
+    data, labels = prepare_train_data(
+        config.new_file_flag,
+        config.filename_train_prepared_data,
+        path_train_original_data="dataset/Train/dataset_training_no_aug.h5",
+        dev_range=np.arange(0, 10, dtype=int),
+        pkt_range=np.arange(0, 300, dtype=int),
+        snr_range=np.arange(20, 80),
+        generate_type=config.PROPRECESS_TYPE,
+        WST_J=config.WST_J,
+        WST_Q=config.WST_Q,
+    )
+
+    # 执行剪枝任务
+    pruning(
+        data,
+        labels,
+        origin_model_path=f"./model/stft/drsn/",
+        pruned_model_path=config.MODEL_DIR_PATH,
+        config=config,
+        test_list=config.TEST_LIST,
     )

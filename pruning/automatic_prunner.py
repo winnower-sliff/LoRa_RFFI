@@ -4,12 +4,12 @@ Author: Mabon Manoj
 可直接在Python中调用，无需命令行参数
 """
 
-import pandas as pd
-import numpy as np
-from pathlib import Path
-from typing import List, Tuple, Optional, Union
-import torch
 import os
+from pathlib import Path
+from typing import List, Optional, Union
+
+import numpy as np
+import pandas as pd
 
 
 class AutoPruner:

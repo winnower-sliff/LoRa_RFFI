@@ -1,10 +1,9 @@
 """恶意设备检测模式相关函数"""
-import os
-import torch
-import numpy as np
 import matplotlib.pyplot as plt
-from sklearn.neighbors import KNeighborsClassifier
+import numpy as np
+import torch
 from sklearn.metrics import roc_curve, auc
+from sklearn.neighbors import KNeighborsClassifier
 
 from training_utils.data_preprocessor import load_generate_triplet, load_data, generate_spectrogram, load_model
 

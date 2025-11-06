@@ -1,14 +1,13 @@
 """分类模式相关函数"""
 import os
 from collections import Counter
+
 import matplotlib.pyplot as plt
 import seaborn as sns
 import torch
-import numpy as np
+from sklearn.metrics import confusion_matrix, accuracy_score
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.svm import SVC
-from sklearn.metrics import confusion_matrix, accuracy_score
-from tqdm import tqdm
 
 from training_utils.data_preprocessor import load_generate_triplet, load_model
 from utils.better_print import TextAnimator
@@ -28,7 +27,8 @@ def test_classification(
     wst_j=None,
     wst_q=None,
     net_name=None,
-    pps_for=None
+    pps_for=None,
+    config=None,
 ):
     """
     * 使用给定的特征提取模型(从指定路径加载)对注册数据集和分类数据集进行分类测试。
@@ -47,6 +47,7 @@ def test_classification(
     :param wst_q: WST Q参数
     :param net_name: 网络名称
     :param pps_for: 预处理类型名称
+    :param pruner: 剪枝器（可选）
     """
     # 加载数据
 
@@ -76,9 +77,13 @@ def test_classification(
         print("=============================")
         model_path = model_dir_path + f"Extractor_{epoch}.pth"
         if not os.path.exists(model_path):
-            print(f"Extractor_{epoch}.pth isn't exist")
+            print(f"{model_path} isn't exist")
         else:
-            model = load_model(model_path, net_type, preprocess_type)
+            if config is None:
+                model = load_model(model_path, net_type, preprocess_type)
+            else:
+                config.custom_pruning_file = os.path.join(config.pruned_output_dir, f"Extractor_{epoch}_1-pr.csv")
+                model = load_model(model_path, net_type, preprocess_type, config=config)
             print("Model loaded!!!")
 
             # 提取特征
@@ -188,14 +193,14 @@ def test_classification(
             w_cms = [conf_mat_knn_w, conf_mat_svm_w, conf_mat_combined]
             wwo_cms = [wo_cms, w_cms]
 
-            # fig, axs = plt.subplots(2, 3, figsize=(20, 12))
-            fig, axs = plt.subplots(2, 2, figsize=(12, 12))
+            fig, axs = plt.subplots(2, 3, figsize=(20, 12))
+            # fig, axs = plt.subplots(2, 2, figsize=(12, 12))
             types = ["KNN", "SVM", "Combined"]
             wwo = ["w/o", "w/"]
 
             for i in range(2):
-                # for j in range(2 if i == 0 else 3):
-                for j in range(2 if i == 0 else 2):
+                for j in range(2 if i == 0 else 3):
+                # for j in range(2 if i == 0 else 2):
                     sns.heatmap(
                         wwo_cms[i][j],
                         annot=True,
@@ -212,7 +217,7 @@ def test_classification(
                     axs[i][j].set_ylabel("True label")
 
             # 删除第一行第三个子图
-            # fig.delaxes(axs[0, 2])
+            fig.delaxes(axs[0, 2])
             fig.suptitle(
                 f"Heatmap Comparison After {epoch} Epochs "
                 f"net type: {net_name}, pps: {pps_for}, Vote Size: {vote_size}",

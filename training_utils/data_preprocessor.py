@@ -6,6 +6,7 @@ import h5py
 import numpy as np
 import torch
 
+from core.config import Config
 from net.TripletNet import TripletNet
 from training_utils.data_loader import LoadDataset
 from utils.signal_trans import TimeFrequencyTransformer, awgn
@@ -102,9 +103,9 @@ def prepare_train_data(
         print(f"Load Time Cost: {timeCost:.3f}s")
     return data, labels
 
-def load_model(file_path, net_type, generate_type, weights_only=True):
+def load_model(file_path, net_type, generate_type, weights_only=True, config: Config = None):
     """从指定路径加载模型"""
-    model = TripletNet(net_type=net_type, in_channels=1 if generate_type == 0 else 2)
+    model = TripletNet(net_type=net_type, in_channels=1 if generate_type == 0 else 2, config=config)
     model.load_state_dict(torch.load(file_path, weights_only=weights_only))
     model.eval()
     print(f"Model loaded from {file_path}")
