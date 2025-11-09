@@ -41,7 +41,7 @@ def pruning(
             pruned_model_dir=pruned_model_path,
             test_list=test_list,
             prune_type=PruneType.l2,
-            h_val=10,
+            h_val=config.H_VAL,
             show_model_summary=False,
             verbose=True,
             training_verbose=True,
