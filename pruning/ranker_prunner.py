@@ -22,7 +22,7 @@ from tqdm import tqdm
 
 from core.config import Config, DEVICE, PruneType, NetworkType
 from net.TripletNet import TripletNet
-from net.net_prune import PrunedRSNet
+from net.net_prune import pruned_drsnet18
 from training_utils.TripletDataset import TripletDataset, TripletLoss
 from training_utils.data_preprocessor import load_model
 
@@ -283,7 +283,7 @@ class PyTorchPruner:
         r = [1 - x for x in r]
 
         # 创建剪枝模型（PrunedRSNet）
-        pruned_embedding_net = PrunedRSNet(r, in_channels=1 if self.config.PROPRECESS_TYPE == 0 else 2)
+        pruned_embedding_net = pruned_drsnet18(r, in_channels=1 if self.config.PROPRECESS_TYPE == 0 else 2)
 
         # 加载原始模型
         original_model = load_model(model_path, NetworkType.WAVELET.value, self.config.PROPRECESS_TYPE)
@@ -400,34 +400,22 @@ class PyTorchPruner:
 
                         val_loss += loss.item()
 
-                        # 计算准确率 - 使用anchor进行分类准确率计算
-                        # 假设模型输出是分类logits，需要根据您的模型结构调整
-                        # 如果您的模型只有嵌入输出，需要添加分类头或者移除准确率计算
-                        try:
-                            # 尝试获取分类输出
-                            if hasattr(model, 'classifier'):
-                                # 如果模型有分类器，使用分类器输出计算准确率
-                                outputs = model.classifier(embedded_anchor)
-                                # 获取标签 - 这里需要根据您的数据集结构调整
-                                # 假设三元组数据集的标签可以通过其他方式获取
-                                # 如果无法获取标签，可以注释掉准确率计算部分
-                                batch_y = torch.zeros(anchor.size(0), device=self.device)  # 临时占位符
-                                _, predicted = torch.max(outputs.data, 1)
-                                total += batch_y.size(0)
-                                correct += (predicted == batch_y).sum().item()
-                        except:
-                            # 如果无法计算准确率，跳过
-                            pass
+                        # 准确率计算：使用嵌入向量的相似度进行验证
+                        # 计算anchor和positive之间的相似度
+                        pos_similarity = F.cosine_similarity(embedded_anchor, embedded_positive)
+                        neg_similarity = F.cosine_similarity(embedded_anchor, embedded_negative)
+
+                        # 如果positive比negative更相似，则认为预测正确
+                        predictions = (pos_similarity > neg_similarity).float()
+                        batch_correct = predictions.sum().item()
+
+                        correct += batch_correct
+                        total += anchor.size(0)
 
                     # 计算平均损失
                     avg_train_loss = total_loss / len(train_loader)
                     avg_val_loss = val_loss / len(valid_loader)
-
-                    # 计算验证准确率（如果可能）
-                    if total > 0:
-                        val_accuracy = 100 * correct / total
-                    else:
-                        val_accuracy = 0.0
+                    val_accuracy = 100 * correct / total if total > 0 else 0.0
 
                     # 记录历史
                     history['loss'].append(avg_train_loss)

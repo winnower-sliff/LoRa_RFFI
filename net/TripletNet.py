@@ -6,7 +6,7 @@ import torch.nn as nn
 from core.config import Config
 from net.net_DRSN import drsnet18
 from net.net_original import FeatureExtractor
-from net.net_prune import PrunedRSNet
+from net.net_prune import pruned_drsnet18
 from training_utils.TripletDataset import TripletLoss
 
 
@@ -22,7 +22,7 @@ class TripletNet(nn.Module):
             # 加载剪枝率
             r = np.loadtxt(config.custom_pruning_file, delimiter=",")
             r = [1 - x for x in r]
-            self.embedding_net = PrunedRSNet(r, in_channels=in_channels)
+            self.embedding_net = pruned_drsnet18(r, in_channels=in_channels)
 
     def forward(self, anchor, positive, negative):
         embedded_anchor = self.embedding_net(anchor)

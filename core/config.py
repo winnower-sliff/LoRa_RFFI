@@ -51,7 +51,8 @@ class Config:
         self.WST_Q = 6
 
         # 剪枝相关的配置
-        self.pruned_output_dir = "./pruning_results/"
+        self.H_VAL = 10 # 剪枝的粒度, 即决定剪枝的激进程度
+        self.pruned_output_dir = "./pruning_results/"   # 剪枝相关文件存放
         self.custom_pruning_file = os.path.join(self.pruned_output_dir, "1-pr.csv")
 
         # 后续设置

@@ -54,12 +54,12 @@ class BasicBlock(nn.Module):
             nn.ReLU(inplace=True),  # 激活函数，原地操作节省内存
             nn.Conv2d(
                 out_channels,
-                out_channels * BasicBlock.expansion,  # 输出通道数乘以扩张比例
+                out_channels * self.expansion,  # 输出通道数乘以扩张比例
                 kernel_size=(3, 3),
                 padding=(1, 1),
                 bias=False,
             ),
-            nn.BatchNorm2d(out_channels * BasicBlock.expansion),
+            nn.BatchNorm2d(out_channels * self.expansion),
             self.shrinkage,  # 应用收缩层
         )
         # 捷径（shortcut）部分，用于直接连接输入和输出，以保持信息的流通
@@ -67,17 +67,17 @@ class BasicBlock(nn.Module):
 
         # 如果捷径的输出维度与残差函数的输出维度不一致
         # 使用1x1卷积来匹配维度
-        if stride != 1 or in_channels != BasicBlock.expansion * out_channels:
+        if stride != 1 or in_channels != self.expansion * out_channels:
             self.shortcut = nn.Sequential(
                 nn.Conv2d(
                     in_channels,
-                    out_channels
-                    * BasicBlock.expansion,  # 输入通道数转为输出通道数乘以扩张比例
+                    out_channels *
+                    self.expansion,  # 输入通道数转为输出通道数乘以扩张比例
                     kernel_size=1,  # 使用1x1卷积核
                     stride=stride,
                     bias=False,
                 ),
-                nn.BatchNorm2d(out_channels * BasicBlock.expansion),  # 批量归一化层
+                nn.BatchNorm2d(out_channels * self.expansion),  # 批量归一化层
             )
 
     def forward(self, x):
@@ -87,11 +87,11 @@ class BasicBlock(nn.Module):
 
 class RSNet(nn.Module):
 
-    def __init__(self, block, num_block, in_channels):  ## person_num
+    def __init__(self, block, num_block, in_channels):
         super().__init__()
 
+        # 初始卷积层
         self.out_channels = 32
-
         self.conv1 = nn.Sequential(
             nn.Conv2d(
                 in_channels,
