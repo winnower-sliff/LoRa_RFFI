@@ -16,45 +16,14 @@ import torch.nn as nn
 from scipy.spatial import distance
 from scipy.stats import entropy
 
-# 导入你的现有模块
-try:
-    from core.config import Config, DEVICE
-except ImportError:
-    # 如果导入失败，创建模拟配置
-    class Config:
-        def __init__(self):
-            self.MODEL_DIR_PATH = "models"
-
-    DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-
-# 在模块级别定义演示模型类
-class DemoModel(nn.Module):
-    """演示用模型"""
-    def __init__(self):
-        super().__init__()
-        self.conv1 = nn.Conv2d(3, 16, 3, padding=1)
-        self.conv2 = nn.Conv2d(16, 32, 3, padding=1)
-        self.conv3 = nn.Conv2d(32, 64, 3, padding=1)
-        self.fc = nn.Linear(64 * 8 * 8, 10)
-        self.pool = nn.AdaptiveAvgPool2d((8, 8))
-
-    def forward(self, x):
-        x = torch.relu(self.conv1(x))
-        x = torch.relu(self.conv2(x))
-        x = torch.relu(self.conv3(x))
-        x = self.pool(x)
-        x = x.view(x.size(0), -1)
-        x = self.fc(x)
-        return x
+from core.config import DEVICE
 
 
 class RankGenerator:
     """排名生成器类"""
 
-    def __init__(self, config: Config = None):
-        self.config = config or Config()
-        self.device = DEVICE
+    def __init__(self):
+        return
 
     def mapping(self, W: torch.Tensor, min_w: float, max_w: float) -> torch.Tensor:
         """
@@ -456,14 +425,8 @@ def main():
 
     args = parser.parse_args()
 
-    # 加载配置
-    if args.config:
-        config = Config()
-    else:
-        config = Config()
-
     # 创建排名生成器
-    rank_gen = RankGenerator(config)
+    rank_gen = RankGenerator()
 
     # 生成排名
     success = rank_gen.generate_ranks(
@@ -491,18 +454,17 @@ def main():
 
 # 生成模型排名
 def generate_model_ranks(model_path: Union[str, Path], output_dir: Union[str, Path] = "rank_results",
-                        method: str = "l2", config: Config = None) -> bool:
+                        method: str = "l2") -> bool:
     """
     参数:
         model_path: 模型路径
         output_dir: 输出目录
         method: 排名方法
-        config: 配置对象
 
     返回:
         success: 是否成功
     """
-    rank_gen = RankGenerator(config)
+    rank_gen = RankGenerator()
     return rank_gen.generate_ranks(
         model_path=Path(model_path),
         output_dir=Path(output_dir),

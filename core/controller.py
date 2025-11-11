@@ -131,5 +131,6 @@ def run_pruning_mode(config):
         origin_model_path=f"./model/stft/drsn/",
         pruned_model_path=config.MODEL_DIR_PATH,
         config=config,
+        preprocess_type=config.PROPRECESS_TYPE,
         test_list=config.TEST_LIST,
     )

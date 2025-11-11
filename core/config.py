@@ -7,6 +7,11 @@ from enum import Enum
 # 设备配置
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
+# 剪枝相关的配置
+H_VAL = 10  # 剪枝的粒度, 即决定剪枝的激进程度
+PRUNED_OUTPUT_DIR = "./pruning_results/"  # 剪枝相关文件存放
+CUSTOM_PRUNING_FILE = os.path.join(PRUNED_OUTPUT_DIR, "1-pr.csv")
+
 
 # 定义运行模式的枚举
 class Mode:
@@ -50,10 +55,6 @@ class Config:
         self.WST_J = 6
         self.WST_Q = 6
 
-        # 剪枝相关的配置
-        self.H_VAL = 10 # 剪枝的粒度, 即决定剪枝的激进程度
-        self.pruned_output_dir = "./pruning_results/"   # 剪枝相关文件存放
-        self.custom_pruning_file = os.path.join(self.pruned_output_dir, "1-pr.csv")
 
         # 后续设置
         if self.NET_TYPE == NetworkType.ORIGINAL.value:

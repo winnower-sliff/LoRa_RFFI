@@ -3,7 +3,6 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-from core.config import Config
 from net.net_DRSN import drsnet18
 from net.net_original import FeatureExtractor
 from net.net_prune import pruned_drsnet18
@@ -11,7 +10,7 @@ from training_utils.TripletDataset import TripletLoss
 
 
 class TripletNet(nn.Module):
-    def __init__(self, net_type, in_channels, margin=0.1, config: Config = None):
+    def __init__(self, net_type, in_channels, custom_pruning_file=None, margin=0.1):
         super(TripletNet, self).__init__()
         self.margin = margin
         if net_type == 0:
@@ -20,7 +19,7 @@ class TripletNet(nn.Module):
             self.embedding_net = drsnet18(in_channels=in_channels)
         elif net_type == 2:
             # 加载剪枝率
-            r = np.loadtxt(config.custom_pruning_file, delimiter=",")
+            r = np.loadtxt(custom_pruning_file, delimiter=",")
             r = [1 - x for x in r]
             self.embedding_net = pruned_drsnet18(r, in_channels=in_channels)
 
