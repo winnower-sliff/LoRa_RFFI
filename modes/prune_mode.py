@@ -1,33 +1,51 @@
 """剪枝模式相关函数"""
+import math
 import os
+import time
 from datetime import datetime
 
 import numpy as np
+import torch
+import torch.nn.functional as F
 from sklearn.model_selection import train_test_split
+from torch.utils.data import DataLoader
+from tqdm import tqdm
 
-from core.config import Config, NetworkType, PRUNED_OUTPUT_DIR, H_VAL
+from PerformanceTest import compute_model_stats, print_model_stats, visualize_pruning_comparison
+from core.config import Config, NetworkType, PRUNED_OUTPUT_DIR, H_VAL, DEVICE
 from core.config import PruneType
-
 from modes.classification_mode import test_classification
-from pruning.ranker_prunner import extract_weight, automatic_pruner_pytorch, custom_prune_model, finetune_model_pytorch
+from plot.loss_plot import plot_loss_curve
+from pruning.Pytorch_prunner import pytorch_native_prune, remove_pruning_masks_and_apply, \
+    compute_pruning_rates, pytorch_prune_model
+from pruning.TinyML_prunner import extract_weight, automatic_pruner_pytorch, TinyML_prune_model
+from training_utils.TripletDataset import TripletDataset, TripletLoss
 from training_utils.data_preprocessor import load_model
 from utils.better_print import print_colored_text
+from utils.yaml_handler import update_nested_yaml_entry
 
 
 def pruning(
-    data,
-    labels,
-    config: Config,
-    origin_model_path: str,
-    pruned_model_path: str,
-    preprocess_type,
-    test_list: list,
-    prune_type: PruneType = PruneType.l2,
-    batch_size=32,
-    show_model_summary=False,
-    skip_finetune=False,
-    verbose=True,
-    training_verbose=True,
+        data,
+        labels,
+        config: Config,
+        origin_model_path: str,
+        prune_model_path: str,
+        dev_range_enrol=None,
+        dev_range_clf=None,
+        pkt_range_enrol=None,
+        pkt_range_clf=None,
+        net_type=None,
+        preprocess_type=None,
+        test_list: list=None,
+        prune_type: PruneType = PruneType.l2,
+        batch_size=32,
+        show_model_summary=False,
+        skip_finetune=False,
+        verbose=True,
+        training_verbose=True,
+        use_pytorch_prune=True,  # 新增：是否使用PyTorch原生剪枝
+        target_sparsity=0.5,  # 新增：目标稀疏度
 ):
     """
 
@@ -35,7 +53,12 @@ def pruning(
     :param labels: 训练标签
     :param config: 配置文件
     :param origin_model_path: 获取初始模型的地址
-    :param pruned_model_path: 剪枝后模型的地址
+    :param prune_model_path: 获取剪枝模型的地址
+    :param dev_range_enrol: 注册数据集中设备的范围。
+    :param dev_range_clf: 分类数据集中设备的范围。
+    :param pkt_range_enrol: 注册数据集中数据包的范围。
+    :param pkt_range_clf: 分类数据集中数据包的范围。
+    :param net_type: 网络类型
     :param preprocess_type: 预处理类型
     :param test_list: 测试点列表
     :param prune_type: 剪枝类型
@@ -44,7 +67,11 @@ def pruning(
     :param skip_finetune: 是否跳过微调
     :param verbose: 是否显示详细信息
     :param training_verbose: 训练时是否显示详细信息
+    :param use_pytorch_prune: 是否使用PyTorch原生剪枝
+    :param target_sparsity: 目标稀疏度 (0-1)
     """
+    # 定义YAML文件路径
+    yaml_file_path = os.path.join(prune_model_path, "experiment_stats.yaml")
 
     # 0 for all, 1 for only prune, 2 for only test
     prune_mode = 0
@@ -53,33 +80,37 @@ def pruning(
 
         # 执行剪枝
         print("开始模型剪枝...")
+        if use_pytorch_prune:
+            print(">>> 使用 PyTorch 原生剪枝方案 <<<")
+        else:
+            print(">>> 使用特定的 TinyML 剪枝方案 <<<")
 
         for exit_epoch in test_list or []:
             print(exit_epoch, test_list)
             print()
             print("=============================")
-            origin_model_dir = origin_model_path + f"Extractor_{exit_epoch}.pth"
-            pruned_model_dir = pruned_model_path + f"Extractor_{exit_epoch}.pth"
-            if not os.path.exists(origin_model_path):
-                print(f"{origin_model_path} isn't exist")
+            origin_model_dir = os.path.join(origin_model_path, f"Extractor_{exit_epoch}.pth")
+            pruned_model_dir = os.path.join(prune_model_path, f"Extractor_{exit_epoch}.pth")
+
+            if not os.path.exists(origin_model_dir):
+                print(f"{origin_model_dir} isn't exist")
             else:
                 # 加载模型和数据
                 print("\n加载模型...")
 
-                model = load_model(origin_model_dir, NetworkType.WAVELET.value, preprocess_type)
+                original_model = load_model(origin_model_dir, config.NET_TYPE, preprocess_type)
                 if show_model_summary:
                     print("模型结构:")
-                    print(model)
+                    print(original_model)
 
                 print("\n加载数据...")
 
-                # 数据集划分 - 分为训练集、验证集、测试集
-                # 终比例：训练集70 %，验证集20 %，测试集10 %
+                # 数据集划分
                 data_train, data_temp, labels_train, labels_temp = train_test_split(
-                    data, labels, test_size=0.3, shuffle=True, random_state=42  # 30%作为临时数据
+                    data, labels, test_size=0.3, shuffle=True, random_state=42
                 )
                 data_valid, data_test, labels_valid, labels_test = train_test_split(
-                    data_temp, labels_temp, test_size=0.333, shuffle=True, random_state=42  # 临时数据的1/3作为测试集
+                    data_temp, labels_temp, test_size=0.333, shuffle=True, random_state=42
                 )
 
                 if verbose:
@@ -89,30 +120,82 @@ def pruning(
                     print(f"  - 验证数据形状: {data_valid.shape}")
                     print(f"  - 测试数据形状: {data_test.shape}")
 
-                prune_ranks_path = PRUNED_OUTPUT_DIR + f"Extractor_{exit_epoch}_l2_idx.csv"
-                prune_rank_path = PRUNED_OUTPUT_DIR + f"Extractor_{exit_epoch}_l2.csv"
-                custom_pruning_file = os.path.join(PRUNED_OUTPUT_DIR, f"Extractor_{exit_epoch}_1-pr.csv")
-
-                # 生成剪枝排名
-                print("\n生成剪枝排名...")
                 prune_start = datetime.now()
-                extract_weight(model, prune_rank_path, prune_ranks_path, show_model_summary)
 
-                # 生成剪枝文件
-                print("\n生成剪枝文件...")
-                automatic_pruner_pytorch(H_VAL, prune_rank_path, exit_epoch)
+                if use_pytorch_prune:
+                    # ========== PyTorch原生剪枝路径 ==========
 
-                # 应用自定义剪枝率创建剪枝模型
-                print("\n创建剪枝模型...")
+                    # 计算剪枝率
+                    print("\n[Pytorch剪枝] 计算剪枝率...")
+                    pruning_rates = compute_pruning_rates(
+                        original_model.embedding_net,
+                        target_sparsity,
+                        method='tinyml_gradient',
+                        show_model_summary=show_model_summary
+                    )
 
-                pruned_model = custom_prune_model(
-                    origin_model_dir, custom_pruning_file, prune_ranks_path, preprocess_type, show_model_summary
-                )
+                    # 应用剪枝
+                    print("\n[Pytorch剪枝] 应用剪枝...")
+                    pruned_embedding_net = pytorch_native_prune(
+                        original_model.embedding_net,
+                        pruning_rates,
+                        method='ln',
+                        show_model_summary=show_model_summary
+                    )
 
-                prune_runtime = datetime.now() - prune_start
+                    # 使剪枝永久化并获取清理后的状态字典
+                    print("\n[Pytorch剪枝] 使剪枝永久化...")
+                    pruned_embedding_net = remove_pruning_masks_and_apply(pruned_embedding_net)
+                    # 这里的 pruned_embedding_net 只是经过剪枝处理的 embedding_net 部分, 缺少完整的 TripletNet 结构包装
 
-                if verbose:
-                    print(f"剪枝运行时间: {prune_runtime.total_seconds()}秒")
+                    print("\n[Pytorch剪枝] 创建剪枝模型...")
+                    pruned_model = pytorch_prune_model(pruned_embedding_net, net_type, preprocess_type)  # 确保结构一致
+
+                    # 剪枝时间
+                    prune_runtime = datetime.now() - prune_start
+
+                    if verbose:
+                        print(f"剪枝运行时间: {prune_runtime.total_seconds():.2f}秒")
+
+                    # 计算原始模型和剪枝模型的统计数据
+                    original_stats = compute_model_stats(original_model, f"original_{exit_epoch}")
+                    pruned_stats = compute_model_stats(pruned_model, f"pruned_{exit_epoch}")
+
+                    # 收集剪枝阶段的统计信息
+                    pruning_info = {
+                        'epoch': exit_epoch,
+                        'prune_runtime': prune_runtime.total_seconds(),
+                        'use_pytorch_prune': use_pytorch_prune,
+                        'target_sparsity': target_sparsity,
+                        'timestamp': datetime.now().isoformat()
+                    }
+
+                    # 剪枝信息写入：
+                    update_nested_yaml_entry(
+                        yaml_file_path,
+                        [f'models', 'pruned', 'pruning_history', f'epoch{exit_epoch}'],
+                        pruning_info
+                    )
+
+                else:
+                    # ========== TinyML剪枝路径 ==========
+                    prune_ranks_path = PRUNED_OUTPUT_DIR + f"Extractor_{exit_epoch}_l2_idx.csv"
+                    prune_rank_path = PRUNED_OUTPUT_DIR + f"Extractor_{exit_epoch}_l2.csv"
+                    custom_pruning_file = os.path.join(PRUNED_OUTPUT_DIR, f"Extractor_{exit_epoch}_1-pr.csv")
+
+                    # 生成剪枝排名
+                    print("\n[TinyML剪枝] 生成剪枝排名...")
+                    extract_weight(original_model, prune_rank_path, prune_ranks_path, show_model_summary)
+
+                    # 生成剪枝文件
+                    print("\n[TinyML剪枝] 生成剪枝文件...")
+                    automatic_pruner_pytorch(H_VAL, prune_rank_path, exit_epoch)
+
+                    # 应用TinyML剪枝率创建剪枝模型
+                    print("\n[TinyML剪枝] 创建剪枝模型...")
+                    pruned_model = TinyML_prune_model(
+                        original_model, custom_pruning_file, prune_ranks_path, preprocess_type, show_model_summary
+                    )
 
                 if show_model_summary:
                     print("剪枝后模型结构:")
@@ -122,26 +205,39 @@ def pruning(
                     print("\n开始微调...")
                     finetune_start = datetime.now()
 
-                    # 5. 微调剪枝模型
-                    finetuned_pruned_model, history = finetune_model_pytorch(
+                    # 微调剪枝模型
+                    finetuned_pruned_model, history = finetune_model(
                         pruned_model, data_train, labels_train, data_valid, labels_valid,
+                        net_type, preprocess_type,
                         checkpoint_dir=pruned_model_dir, exit_epoch=exit_epoch,
                         batch_size=batch_size, verbose=1 if training_verbose else 0
                     )
-
+                    # 微调时间
                     finetune_runtime = datetime.now() - finetune_start
 
-                    print(f"微调时间: {finetune_runtime.total_seconds()}秒")
-                    if history and 'loss' in history:
-                        print(f"微调轮数: {len(history['loss'])}")
-                        if len(history['loss']) > 0:
-                            print(f"每轮平均时间: {finetune_runtime.total_seconds() / len(history['loss'])}秒")
+                    print(f"微调时间: {finetune_runtime.total_seconds():.2f}秒")
+                    print(f"微调轮数: {len(history['loss'])}")
+                    print(f"每轮平均时间: {finetune_runtime.total_seconds() / len(history['loss']):.2f}秒")
 
-                    # print(f"最终准确率: {accuracy:.2f}%")
+                    # 微调完成后，更新统计信息
+                    finetune_info = {
+                        'epoch': exit_epoch,
+                        'finetune_runtime': finetune_runtime.total_seconds(),
+                        'final_val_loss': history['best_val_loss'],
+                        'num_epochs_trained': len(history['loss']) if history and 'loss' in history else 0
+                    }
+
+                    # 微调信息写入：
+                    update_nested_yaml_entry(
+                        yaml_file_path,
+                        [f'models', 'pruned', 'finetune_history', f'epoch{exit_epoch}'],
+                        finetune_info
+                    )
+
                 else:
-                    print("跳过微调步骤")
-
-                print(f"总剪枝运行时间: {prune_runtime.total_seconds()}秒")
+                    # 即使跳过微调也需要保存剪枝后的模型
+                    torch.save(pruned_model.state_dict(), pruned_model_dir)
+                    print("跳过微调步骤，已保存剪枝模型")
 
     if prune_mode == 0 or prune_mode == 2:
         # 测试最终模型
@@ -153,19 +249,202 @@ def pruning(
         test_classification(
             file_path_enrol="dataset/Train/dataset_training_no_aug.h5",
             file_path_clf="dataset/Test/dataset_seen_devices.h5",
-            dev_range_enrol=np.arange(15, 30, dtype=int),
-            pkt_range_enrol=np.arange(0, 200, dtype=int),
-            dev_range_clf=np.arange(15, 30, dtype=int),
-            pkt_range_clf=np.arange(0, 200, dtype=int),
+            dev_range_enrol=dev_range_enrol,
+            pkt_range_enrol=pkt_range_enrol,
+            dev_range_clf=dev_range_clf,
+            pkt_range_clf=pkt_range_clf,
             net_type=config.NET_TYPE,
             preprocess_type=preprocess_type,
             test_list=config.TEST_LIST,
-            model_dir_path=config.MODEL_DIR_PATH,
-            wst_j=config.WST_J,
-            wst_q=config.WST_Q,
+            model_dir=config.MODEL_DIR,
             net_name=config.NET_NAME,
             pps_for=config.PPS_FOR,
-            config=config
+            is_pruned=True,
         )
 
     return
+
+def finetune_model(
+                model,
+                data_train,
+                labels_train,
+                data_valid,
+                labels_valid,
+                net_type,
+                preprocess_type,
+                checkpoint_dir: str,
+                exit_epoch: int,
+                batch_size: int,
+                verbose: int
+):
+    """
+    微调剪枝后的模型
+
+    :param model: 待微调的模型
+    :param data_train: 训练数据
+    :param labels_train: 训练标签
+    :param data_valid: 验证数据
+    :param labels_valid: 验证标签
+    :param net_type: 网络类型
+    :param preprocess_type: 预处理类型
+    :param checkpoint_dir: 模型检查点保存路径
+    :param exit_epoch: 退出轮次
+    :param batch_size: 批处理大小
+    :param verbose: 详细输出级别 (0: 静默, 1: 基本信息, 2: 详细信息)
+    """
+
+    # 数据加载器
+    train_dataset = TripletDataset(data_train, labels_train)
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+    valid_dataset = TripletDataset(data_valid, labels_valid)
+    valid_loader = DataLoader(valid_dataset, batch_size=batch_size)
+
+    # 优化器和损失函数
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+    loss_fn = TripletLoss(margin=0.1)
+
+    model.to(DEVICE)
+    best_val_loss = float('inf')
+
+    num_epochs = 150
+    batch_num = math.ceil(len(train_dataset) / batch_size)
+
+    patience = 10
+    patience_counter = 0
+
+
+    print(
+        "\n---------------------\n"
+        "Num of epoch: {}\n"
+        "Batch size: {}\n"
+        "Num of train batch: {}\n"
+        "---------------------\n".format(num_epochs, batch_size, batch_num)
+    )
+    loss_per_epoch = []
+
+    history = {'loss': [], 'val_loss': [], 'val_accuracy': []}
+
+    # 总进度条
+    with tqdm(total=num_epochs, desc=f"Extractor_{exit_epoch}.pth") as total_bar:
+        for epoch in range(num_epochs):
+            start_time_ep = time.time()
+            total_loss = 0.0
+
+            # 训练阶段
+            model.to(DEVICE)
+            model.train()
+
+            # 每一轮训练进度条
+            with tqdm(total=batch_num, desc=f"Epoch {epoch}", leave=False) as pbar:
+                for batch_idx, (anchor, positive, negative) in enumerate(train_loader):
+
+                    anchor, positive, negative = (
+                        anchor.to(DEVICE),
+                        positive.to(DEVICE),
+                        negative.to(DEVICE),
+                    )
+
+                    # 前向传播
+                    embedded_anchor, embedded_positive, embedded_negative = model(
+                        anchor, positive, negative
+                    )
+
+                    loss = loss_fn(
+                        embedded_anchor, embedded_positive, embedded_negative
+                    )
+
+                    # 反向传播与优化
+                    optimizer.zero_grad()
+                    loss.backward()
+                    optimizer.step()
+
+                    total_loss += loss.item()
+                    pbar.update(1)
+
+            # 验证阶段
+            model.eval()
+            val_loss = 0.0
+            correct = 0
+            total = 0
+
+            with torch.no_grad():
+                for batch_idx, (anchor, positive, negative) in enumerate(valid_loader):
+                    anchor = anchor.to(DEVICE)
+                    positive = positive.to(DEVICE)
+                    negative = negative.to(DEVICE)
+
+                    # 向前传播
+                    embedded_anchor, embedded_positive, embedded_negative = model(
+                        anchor, positive, negative
+                    )
+
+                    loss = loss_fn(
+                        embedded_anchor, embedded_positive, embedded_negative
+                    )
+
+                    val_loss += loss.item()
+
+                    # 准确率计算：使用嵌入向量的相似度进行验证
+                    # 计算anchor和positive之间的相似度
+                    pos_similarity = F.cosine_similarity(embedded_anchor, embedded_positive)
+                    neg_similarity = F.cosine_similarity(embedded_anchor, embedded_negative)
+
+                    # 如果positive比negative更相似，则认为预测正确
+                    predictions = (pos_similarity > neg_similarity).float()
+                    batch_correct = predictions.sum().item()
+
+                    correct += batch_correct
+                    total += anchor.size(0)
+
+                # 计算平均损失
+                avg_train_loss = total_loss / len(train_loader)
+                avg_val_loss = val_loss / len(valid_loader)
+                val_accuracy = 100 * correct / total if total > 0 else 0.0
+
+                # 记录历史
+                history['loss'].append(avg_train_loss)
+                history['val_loss'].append(avg_val_loss)
+                history['val_accuracy'].append(val_accuracy)
+
+                text = (
+                    f'Train Loss: {avg_train_loss:.4f}, '+
+                    f'Val Loss: {avg_val_loss:.4f}, '+
+                    f'Val Acc: {val_accuracy:.2f}%'
+                )
+                tqdm.write(text)
+
+                # 早停和模型保存
+
+                if avg_val_loss < best_val_loss:
+                    best_val_loss = avg_val_loss
+                    # 保存模型到指定路径
+                    torch.save(model.state_dict(), checkpoint_dir)
+                    patience_counter = 0
+                    print(f"保存最佳模型，验证损失: {best_val_loss:.4f}")
+                    tqdm.write(f"Model saved to {checkpoint_dir}")
+
+                else:
+                    patience_counter += 1
+
+                if patience_counter >= patience:
+                    if verbose:
+                        print("-- 早停触发!!! --")
+                    history['best_val_loss'] = best_val_loss
+                    break
+
+                # 记录每轮损失
+                loss_per_epoch.append(avg_train_loss)
+
+                # 绘制loss折线图
+                pic_save_path = checkpoint_dir + f"loss_{epoch+1}.png"
+                plot_loss_curve(loss_per_epoch, num_epochs, net_type, preprocess_type, pic_save_path)
+            # 更新进度条
+            total_bar.update(1)
+
+    # 加载最佳模型
+    if os.path.exists(checkpoint_dir):
+        model.load_state_dict(torch.load(checkpoint_dir))
+        if verbose:
+            print(f"加载最佳模型: {checkpoint_dir}")
+
+    return model, history

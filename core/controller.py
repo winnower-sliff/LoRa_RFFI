@@ -16,7 +16,7 @@ def main(mode=Mode.TRAIN):
 
     # 移除命令行参数解析，保留默认值
     print(f"Running mode: {mode}")
-    print(f"Net DIRNAME: {config.MODEL_DIR_PATH}")
+    print(f"Net NAME: {config.NET_NAME}")
 
     # 使用字典映射替代 if-elif-else 结构
     mode_functions = {
@@ -58,7 +58,7 @@ def run_train_mode(config):
         net_type=config.NET_TYPE,
         preprocess_type=config.PROPRECESS_TYPE,
         test_list=config.TEST_LIST,
-        model_dir_path=config.MODEL_DIR_PATH,
+        model_dir_path=config.ORIGIN_MODEL_DIR,
     )
 
 
@@ -70,16 +70,14 @@ def run_classification_mode(config):
     test_classification(
         file_path_enrol="dataset/Train/dataset_training_no_aug.h5",
         file_path_clf="dataset/Test/dataset_seen_devices.h5 ",
-        dev_range_enrol=np.arange(10, 20, dtype=int),
+        dev_range_enrol=np.arange(0, 20, dtype=int),
         pkt_range_enrol=np.arange(0, 200, dtype=int),
-        dev_range_clf=np.arange(10, 20, dtype=int),
+        dev_range_clf=np.arange(0, 20, dtype=int),
         pkt_range_clf=np.arange(0, 200, dtype=int),
         net_type=config.NET_TYPE,
         preprocess_type=config.PROPRECESS_TYPE,
         test_list=config.TEST_LIST,
-        model_dir_path=config.MODEL_DIR_PATH,
-        wst_j=config.WST_J,
-        wst_q=config.WST_Q,
+        model_dir=config.MODEL_DIR,
         net_name=config.NET_NAME,
         pps_for=config.PPS_FOR,
     )
@@ -103,7 +101,7 @@ def run_rogue_device_detection_mode(config):
         net_type=config.NET_TYPE,
         preprocess_type=config.PROPRECESS_TYPE,
         test_list=config.TEST_LIST,
-        model_dir_path=config.MODEL_DIR_PATH,
+        model_dir_path=config.MODEL_DIR,
         wst_j=config.WST_J,
         wst_q=config.WST_Q,
     )
@@ -128,9 +126,14 @@ def run_pruning_mode(config):
     pruning(
         data,
         labels,
-        origin_model_path=f"./model/stft/drsn/",
-        pruned_model_path=config.MODEL_DIR_PATH,
+        origin_model_path=config.ORIGIN_MODEL_DIR,
+        prune_model_path=config.PRUNED_MODEL_DIR,
         config=config,
+        dev_range_enrol=np.arange(0, 20, dtype=int),
+        pkt_range_enrol=np.arange(0, 200, dtype=int),
+        dev_range_clf=np.arange(0, 20, dtype=int),
+        pkt_range_clf=np.arange(0, 200, dtype=int),
+        net_type=config.NET_TYPE,
         preprocess_type=config.PROPRECESS_TYPE,
         test_list=config.TEST_LIST,
     )

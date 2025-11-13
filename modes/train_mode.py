@@ -9,6 +9,7 @@ import torch.optim as optim
 import matplotlib.pyplot as plt
 import time
 
+from plot.loss_plot import plot_loss_curve
 from training_utils.TripletDataset import TripletDataset, TripletLoss
 from net.TripletNet import TripletNet
 
@@ -127,36 +128,8 @@ def train(data, labels, batch_size=32, num_epochs=200, learning_rate=1e-3,
 
                 # 绘制loss折线图
                 if test_list and (epoch + 1) in test_list[-3:]:
-                    # print("Plotting results... ")
-                    fig, ax1 = plt.subplots()
-                    ax1.plot(
-                        range(len(loss_per_epoch)),
-                        loss_per_epoch,
-                        label="Loss",
-                        color="red",
-                    )
-                    ax1.set_xlabel("Epoch")
-                    ax1.set_ylabel("Loss", color="red")
-                    ax1.tick_params(axis="y", labelcolor="red")
-
-                    # 添加标题和图例
-                    net_name = "origin" if net_type == 0 else "drsn"
-                    pps_for = "stft" if preprocess_type == 0 else "wst"
-                    plt.title(
-                        f"Loss of {num_epochs} Epoch, Net: {net_name}, Convert Type: {pps_for}"
-                    )
-                    fig.legend(
-                        loc="upper right",
-                        bbox_to_anchor=(1, 1),
-                        bbox_transform=ax1.transAxes,
-                    )
-
-                    # 显示图表
-                    plt.grid(True)
-
                     pic_save_path = model_dir_path + f"loss_{epoch+1}.png"
-                    plt.savefig(pic_save_path)
-                    # plt.show()
+                    plot_loss_curve(loss_per_epoch, num_epochs, net_type, preprocess_type, pic_save_path)
 
             # 更新总进度条
             total_bar.update(1)

@@ -5,13 +5,15 @@ from collections import Counter
 import matplotlib.pyplot as plt
 import seaborn as sns
 import torch
+import yaml
 from sklearn.metrics import confusion_matrix, accuracy_score
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.svm import SVC
 
-from plot.confusion import plot_confusion_matrices
+from plot.confusion_plot import plot_confusion_matrices
 from training_utils.data_preprocessor import load_generate_triplet, load_model
 from utils.better_print import TextAnimator
+from utils.yaml_handler import update_nested_yaml_entry
 
 
 def test_classification(
@@ -24,11 +26,10 @@ def test_classification(
     net_type=None,
     preprocess_type=None,
     test_list=None,
-    model_dir_path=None,
-    wst_j=None,
-    wst_q=None,
+    model_dir=None,
     net_name=None,
     pps_for=None,
+    is_pruned=False,
     enable_plots=True,
 ):
     """
@@ -43,12 +44,10 @@ def test_classification(
     :param net_type: 网络类型
     :param preprocess_type: 预处理类型
     :param test_list: 测试点列表
-    :param model_dir_path: 模型目录路径
-    :param wst_j: WST J参数
-    :param wst_q: WST Q参数
+    :param model_dir: 模型目录路径
     :param net_name: 网络名称
     :param pps_for: 预处理类型名称
-    :param pruner: 剪枝器（可选）
+    :param is_pruned: 是否剪枝测试（可选）
     :param enable_plots: 控制是否绘图（默认为True）
     """
     # 加载数据
@@ -68,16 +67,28 @@ def test_classification(
     )
 
     # 加载分类数据集(IQ样本和标签)
-
     label_clf, triplet_data_clf = load_generate_triplet(
         file_path_clf, dev_range_clf, pkt_range_clf, preprocess_type
     )
     print("\nData loaded!!!")
 
+    # 创建性能记录字典
+    classification_info = {}
+    # 定义YAML文件路径（在循环内部定义，确保正确的路径）
+    yaml_file_path = os.path.join(model_dir, "performance_records.yaml")
+
     for epoch in test_list or []:
         print()
         print("=============================")
-        model_path = model_dir_path + f"Extractor_{epoch}.pth"
+        if not is_pruned:
+            model_path = os.path.join(model_dir, 'origin')
+        else:
+            model_path = os.path.join(model_dir, 'prune')
+        # 保存路径
+        confusion_save_dir = os.path.join(model_path, f"cft/")
+        model_path = os.path.join(model_path, f"Extractor_{epoch}.pth")
+
+
         if not os.path.exists(model_path):
             print(f"{model_path} isn't exist")
         else:
@@ -109,8 +120,6 @@ def test_classification(
             try:
                 text = TextAnimator("Device predicting", "Device prediction finish")
                 text.start()
-
-                # dev_range_clf = dev_range_clf[dev_range_clf != 39]
 
                 # 提取分类数据集的特征
                 with torch.no_grad():
@@ -191,10 +200,31 @@ def test_classification(
             w_cms = [conf_mat_knn_w, conf_mat_svm_w, conf_mat_combined]
             wwo_cms = [wo_cms, w_cms]
 
+            # 记录性能数据
+            classification_info = {
+                'accuracies': {
+                    'knn_wo_voting': float(wo_acc_knn),
+                    'svm_wo_voting': float(wo_acc_svm),
+                    'knn_w_voting': float(w_acc_knn),
+                    'svm_w_voting': float(w_acc_svm),
+                    'combined_w_weighted_voting': float(acc_combined)
+                },
+                'vote_size': vote_size,
+                'weight_knn': float(weight_knn),
+                'weight_svm': float(weight_svm)
+            }
+            # 使用覆盖模式更新测试结果信息
+            model_type = 'pruned' if is_pruned else 'origin'
+            update_nested_yaml_entry(
+                yaml_file_path,
+                [f'models', model_type, 'classification_history', f'epoch{epoch}'],
+                classification_info
+            )
+
             if enable_plots:
-                dir_name = f"{pps_for}_{net_name}_cft/"
-                save_dir = os.path.join(model_dir_path, dir_name)
-                plot_confusion_matrices(wwo_cms, wwo_accs, epoch, net_name, pps_for, vote_size, save_dir)
+                # 确保保存目录存在
+                os.makedirs(confusion_save_dir, exist_ok=True)
+                plot_confusion_matrices(wwo_cms, wwo_accs, epoch, net_name, pps_for, vote_size, confusion_save_dir)
 
             # T-SNE 3D绘图
             # tsne_3d_plot(feature_clf[0],labels=label_clf)

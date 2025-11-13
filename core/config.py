@@ -1,5 +1,8 @@
 """配置管理模块"""
 import os
+import random
+
+import numpy as np
 import torch
 from enum import Enum
 
@@ -23,9 +26,9 @@ class Mode:
 
 # 定义网络类型枚举
 class NetworkType(Enum):
-    ORIGINAL = 0      # 原始网络
-    WAVELET = 1       # 小波变换网络
-    PRUNE = 2         # 剪枝模型
+    RESNET = 0      # 残差网络
+    DRSN = 1       # 深度残差网路
+    MobileNet = 2  # MobileNet网络
 
 
 # 定义预处理类型枚举
@@ -44,8 +47,8 @@ class PruneType(str, Enum):
 class Config:
     def __init__(self):
         # 不要 net_0 & pps_1
-        # 0 for origin, 1 for drsn, 2 for prune
-        self.NET_TYPE = NetworkType.PRUNE.value
+        # 设置网络类型
+        self.NET_TYPE = NetworkType.MobileNet.value
         # 0 for stft, 1 for wst
         self.PROPRECESS_TYPE = PreprocessType.STFT.value
         # 我们需要一个新的训练文件吗？
@@ -57,25 +60,38 @@ class Config:
 
 
         # 后续设置
-        if self.NET_TYPE == NetworkType.ORIGINAL.value:
-            self.NET_NAME = "origin"
-        elif self.NET_TYPE == NetworkType.WAVELET.value:
+        if self.NET_TYPE == NetworkType.RESNET.value:
+            self.NET_NAME = "resnet"
+        elif self.NET_TYPE == NetworkType.DRSN.value:
             self.NET_NAME = "drsn"
-        elif self.NET_TYPE == NetworkType.PRUNE.value:
-            self.NET_NAME = "prune"
+        elif self.NET_TYPE == NetworkType.MobileNet.value:
+            self.NET_NAME = "mobilenet"
 
         if self.PROPRECESS_TYPE == PreprocessType.STFT.value:
             self.PPS_FOR = "stft"
-            self.MODEL_DIR_PATH = f"./model/{self.PPS_FOR}/{self.NET_NAME}/"
+            self.MODEL_DIR= f"./model/{self.PPS_FOR}/{self.NET_NAME}/"
+            self.ORIGIN_MODEL_DIR = f"./model/{self.PPS_FOR}/{self.NET_NAME}/origin/"
+            self.PRUNED_MODEL_DIR = f"./model/{self.PPS_FOR}/{self.NET_NAME}/prune/"
             self.filename_train_prepared_data = f"train_data_{self.PPS_FOR}.h5"
         else:
             self.PPS_FOR = "wst"
-            self.MODEL_DIR_PATH = (
+            self.ORIGIN_MODEL_DIR_PATH = (
                 f"./model/{self.PPS_FOR}_j{self.WST_J}q{self.WST_Q}/{self.NET_NAME}/"
             )
             self.filename_train_prepared_data = (
                 f"train_data_{self.PPS_FOR}_j{self.WST_J}q{self.WST_Q}.h5"
             )
 
-        if not os.path.exists(self.MODEL_DIR_PATH):
-            os.makedirs(self.MODEL_DIR_PATH)
+        if not os.path.exists(self.ORIGIN_MODEL_DIR):
+            os.makedirs(self.ORIGIN_MODEL_DIR)
+
+
+def set_seed(seed=42):
+    """设置随机种子以确保实验可重现性"""
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
