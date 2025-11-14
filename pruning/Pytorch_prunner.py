@@ -5,7 +5,6 @@ import torch
 import torch.nn as nn
 import torch.nn.utils.prune as prune
 
-from PerformanceTest import compute_model_stats
 from net.TripletNet import TripletNet
 
 

@@ -11,7 +11,6 @@ from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from PerformanceTest import compute_model_stats, print_model_stats, visualize_pruning_comparison
 from core.config import Config, NetworkType, PRUNED_OUTPUT_DIR, H_VAL, DEVICE
 from core.config import PruneType
 from modes.classification_mode import test_classification
@@ -29,8 +28,7 @@ def pruning(
         data,
         labels,
         config: Config,
-        origin_model_path: str,
-        prune_model_path: str,
+        model_dir: str,
         dev_range_enrol=None,
         dev_range_clf=None,
         pkt_range_enrol=None,
@@ -52,8 +50,7 @@ def pruning(
     :param data: 训练数据。
     :param labels: 训练标签
     :param config: 配置文件
-    :param origin_model_path: 获取初始模型的地址
-    :param prune_model_path: 获取剪枝模型的地址
+    :param model_dir: 模型目录路径
     :param dev_range_enrol: 注册数据集中设备的范围。
     :param dev_range_clf: 分类数据集中设备的范围。
     :param pkt_range_enrol: 注册数据集中数据包的范围。
@@ -71,7 +68,7 @@ def pruning(
     :param target_sparsity: 目标稀疏度 (0-1)
     """
     # 定义YAML文件路径
-    yaml_file_path = os.path.join(prune_model_path, "experiment_stats.yaml")
+    yaml_file_path = os.path.join(model_dir, "performance_records.yaml")
 
     # 0 for all, 1 for only prune, 2 for only test
     prune_mode = 0
@@ -89,8 +86,8 @@ def pruning(
             print(exit_epoch, test_list)
             print()
             print("=============================")
-            origin_model_dir = os.path.join(origin_model_path, f"Extractor_{exit_epoch}.pth")
-            pruned_model_dir = os.path.join(prune_model_path, f"Extractor_{exit_epoch}.pth")
+            origin_model_dir = os.path.join(model_dir, f"origin/Extractor_{exit_epoch}.pth")
+            pruned_model_dir = os.path.join(model_dir, f"prune/Extractor_{exit_epoch}.pth")
 
             if not os.path.exists(origin_model_dir):
                 print(f"{origin_model_dir} isn't exist")
@@ -156,10 +153,6 @@ def pruning(
 
                     if verbose:
                         print(f"剪枝运行时间: {prune_runtime.total_seconds():.2f}秒")
-
-                    # 计算原始模型和剪枝模型的统计数据
-                    original_stats = compute_model_stats(original_model, f"original_{exit_epoch}")
-                    pruned_stats = compute_model_stats(pruned_model, f"pruned_{exit_epoch}")
 
                     # 收集剪枝阶段的统计信息
                     pruning_info = {

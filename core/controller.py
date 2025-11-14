@@ -70,9 +70,9 @@ def run_classification_mode(config):
     test_classification(
         file_path_enrol="dataset/Train/dataset_training_no_aug.h5",
         file_path_clf="dataset/Test/dataset_seen_devices.h5 ",
-        dev_range_enrol=np.arange(0, 20, dtype=int),
-        pkt_range_enrol=np.arange(0, 200, dtype=int),
-        dev_range_clf=np.arange(0, 20, dtype=int),
+        dev_range_enrol=np.arange(15, 30, dtype=int),
+        pkt_range_enrol=np.arange(200, 400, dtype=int),
+        dev_range_clf=np.arange(15, 30, dtype=int),
         pkt_range_clf=np.arange(0, 200, dtype=int),
         net_type=config.NET_TYPE,
         preprocess_type=config.PROPRECESS_TYPE,
@@ -126,8 +126,7 @@ def run_pruning_mode(config):
     pruning(
         data,
         labels,
-        origin_model_path=config.ORIGIN_MODEL_DIR,
-        prune_model_path=config.PRUNED_MODEL_DIR,
+        model_dir=config.MODEL_DIR,
         config=config,
         dev_range_enrol=np.arange(0, 20, dtype=int),
         pkt_range_enrol=np.arange(0, 200, dtype=int),

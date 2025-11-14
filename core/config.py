@@ -82,8 +82,12 @@ class Config:
                 f"train_data_{self.PPS_FOR}_j{self.WST_J}q{self.WST_Q}.h5"
             )
 
+        if not os.path.exists(self.MODEL_DIR):
+            os.makedirs(self.MODEL_DIR)
         if not os.path.exists(self.ORIGIN_MODEL_DIR):
             os.makedirs(self.ORIGIN_MODEL_DIR)
+        if not os.path.exists(self.PRUNED_MODEL_DIR):
+            os.makedirs(self.PRUNED_MODEL_DIR)
 
 
 def set_seed(seed=42):

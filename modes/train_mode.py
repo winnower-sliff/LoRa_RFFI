@@ -17,7 +17,7 @@ from net.TripletNet import TripletNet
 from core.config import DEVICE
 
 
-def train(data, labels, batch_size=32, num_epochs=200, learning_rate=1e-3, 
+def  train(data, labels, batch_size=16, num_epochs=200, learning_rate=1e-3,
           net_type=None, preprocess_type=None, test_list=None, model_dir_path=None):
     """
     准备数据并训练三元组网络模型。

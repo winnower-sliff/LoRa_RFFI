@@ -13,7 +13,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from PerformanceTest import compute_model_stats
 # 从配置模块导入
 from core.config import NetworkType, PRUNED_OUTPUT_DIR
 from net.TripletNet import TripletNet

@@ -1,11 +1,9 @@
 """分类模式相关函数"""
 import os
+import time
 from collections import Counter
 
-import matplotlib.pyplot as plt
-import seaborn as sns
 import torch
-import yaml
 from sklearn.metrics import confusion_matrix, accuracy_score
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.svm import SVC
@@ -101,7 +99,9 @@ def test_classification(
                 text = TextAnimator("Feature extracting", "Feature extracted")
                 text.start()
                 with torch.no_grad():
+                    start_time = time.time()
                     feature_enrol = model(*triplet_data_enrol)
+                    enrol_feature_extraction_time = time.time() - start_time
 
                 # 使用 K-NN 分类器进行训练
                 knnclf = KNeighborsClassifier(n_neighbors=100, metric="euclidean")
@@ -123,7 +123,11 @@ def test_classification(
 
                 # 提取分类数据集的特征
                 with torch.no_grad():
+                    start_time = time.time()
                     feature_clf = model(*triplet_data_clf)
+                    clf_feature_extraction_time = time.time() - start_time
+
+                start_time = time.time()
 
                 # K-NN和SVM的初步预测
                 pred_label_knn_wo = knnclf.predict(feature_clf[0])
@@ -175,10 +179,14 @@ def test_classification(
                 wwo_accs = [wo_accs, w_accs]
 
             finally:
+                prediction_time = time.time() - start_time
                 text.stop()
 
             print("-----------------------------")
             print(f"Extractor ID: {epoch}")
+            print(f"Enroll Feature extraction time: {enrol_feature_extraction_time:.4f}s")
+            print(f"Classification feature extraction time: {clf_feature_extraction_time:.4f}s")
+            print(f"Prediction time: {prediction_time:.4f}s")
             print(f"Vote Size: {vote_size}")
             print(
                 f"KNN accuracy\t\tw/o\tvoting = {wo_acc_knn * 100:.2f}%\n"
@@ -208,6 +216,11 @@ def test_classification(
                     'knn_w_voting': float(w_acc_knn),
                     'svm_w_voting': float(w_acc_svm),
                     'combined_w_weighted_voting': float(acc_combined)
+                },
+                'inference_times': {
+                    'enrol_feature_extraction': float(enrol_feature_extraction_time),
+                    'classification_feature_extraction': float(clf_feature_extraction_time),
+                    'knn_prediction': float(prediction_time),
                 },
                 'vote_size': vote_size,
                 'weight_knn': float(weight_knn),
