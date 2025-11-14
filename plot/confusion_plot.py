@@ -4,14 +4,14 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 
-def plot_confusion_matrices(wwo_cms, wwo_accs, epoch, net_name, pps_for, vote_size, save_dir):
+def plot_confusion_matrices(wwo_cms, wwo_accs, epoch, net_type, pps_for, vote_size, save_dir):
     """
     绘制不同分类器在有/无投票情况下的混淆矩阵
 
     :param wwo_cms: 包含混淆矩阵的列表 [无投票矩阵, 有投票矩阵]
     :param wwo_accs: 包含准确率的列表 [无投票准确率, 有投票准确率]
     :param epoch: 当前训练轮数
-    :param net_name: 网络名称
+    :param net_type: 网络类型
     :param pps_for: 预处理类型名称
     :param vote_size: 投票窗口大小
     :param save_dir: 图片保存目录
@@ -43,7 +43,7 @@ def plot_confusion_matrices(wwo_cms, wwo_accs, epoch, net_name, pps_for, vote_si
     fig.delaxes(axs[0, 2])
     fig.suptitle(
         f"Heatmap Comparison After {epoch} Epochs "
-        f"net type: {net_name}, pps: {pps_for}, Vote Size: {vote_size}",
+        f"net type: {net_type}, pps: {pps_for}, Vote Size: {vote_size}",
         fontsize=16,
     )
 

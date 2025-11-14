@@ -21,14 +21,15 @@ class Mode:
     TRAIN = "train"
     CLASSIFICATION = "classification"
     ROGUE_DEVICE_DETECTION = "rogue_device_detection"
-    PRUNING = "pruning"
+    PRUNE = "prune"
+    DISTILLATION = "distillation"
 
 
 # 定义网络类型枚举
 class NetworkType(Enum):
-    RESNET = 0      # 残差网络
-    DRSN = 1       # 深度残差网路
-    MobileNet = 2  # MobileNet网络
+    RESNET = "resnet"      # 残差网络
+    DRSN = "drsn"       # 深度残差网路
+    MobileNet = "mobilenet"  # MobileNet网络
 
 
 # 定义预处理类型枚举
@@ -37,18 +38,16 @@ class PreprocessType(Enum):
     WST = 1           # 小波散射变换
 
 
-# 定义剪枝类型枚举
-class PruneType(str, Enum):
-    l2 = "l2"
-    fpgm = "fpgm"
-
 
 # 配置类，用于存储全局配置参数
 class Config:
-    def __init__(self):
-        # 不要 net_0 & pps_1
+    def __init__(self, mode):
+        # 设置模式
+        self.mode = mode
         # 设置网络类型
-        self.NET_TYPE = NetworkType.MobileNet.value
+        self.NET_TYPE = NetworkType.RESNET.value
+        self.TEACHER_NET_TYPE = NetworkType.RESNET.value
+        self.STUDENT_NET_TYPE = NetworkType.MobileNet.value
         # 0 for stft, 1 for wst
         self.PROPRECESS_TYPE = PreprocessType.STFT.value
         # 我们需要一个新的训练文件吗？
@@ -60,23 +59,17 @@ class Config:
 
 
         # 后续设置
-        if self.NET_TYPE == NetworkType.RESNET.value:
-            self.NET_NAME = "resnet"
-        elif self.NET_TYPE == NetworkType.DRSN.value:
-            self.NET_NAME = "drsn"
-        elif self.NET_TYPE == NetworkType.MobileNet.value:
-            self.NET_NAME = "mobilenet"
 
         if self.PROPRECESS_TYPE == PreprocessType.STFT.value:
             self.PPS_FOR = "stft"
-            self.MODEL_DIR= f"./model/{self.PPS_FOR}/{self.NET_NAME}/"
-            self.ORIGIN_MODEL_DIR = f"./model/{self.PPS_FOR}/{self.NET_NAME}/origin/"
-            self.PRUNED_MODEL_DIR = f"./model/{self.PPS_FOR}/{self.NET_NAME}/prune/"
+            self.MODEL_DIR= f"./model/{self.PPS_FOR}/{self.NET_TYPE}/"
+            self.TEACHER_MODEL_DIR = f"./model/{self.PPS_FOR}/{self.TEACHER_NET_TYPE}/"
+            self.STUDENT_MODEL_DIR = f"./model/{self.PPS_FOR}/{self.STUDENT_NET_TYPE}/"
             self.filename_train_prepared_data = f"train_data_{self.PPS_FOR}.h5"
         else:
             self.PPS_FOR = "wst"
             self.ORIGIN_MODEL_DIR_PATH = (
-                f"./model/{self.PPS_FOR}_j{self.WST_J}q{self.WST_Q}/{self.NET_NAME}/"
+                f"./model/{self.PPS_FOR}_j{self.WST_J}q{self.WST_Q}/{self.NET_TYPE}/"
             )
             self.filename_train_prepared_data = (
                 f"train_data_{self.PPS_FOR}_j{self.WST_J}q{self.WST_Q}.h5"
@@ -84,10 +77,6 @@ class Config:
 
         if not os.path.exists(self.MODEL_DIR):
             os.makedirs(self.MODEL_DIR)
-        if not os.path.exists(self.ORIGIN_MODEL_DIR):
-            os.makedirs(self.ORIGIN_MODEL_DIR)
-        if not os.path.exists(self.PRUNED_MODEL_DIR):
-            os.makedirs(self.PRUNED_MODEL_DIR)
 
 
 def set_seed(seed=42):

@@ -5,19 +5,14 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="8d0acb0b-396f-43ce-9d11-ab82addef2ee" name="Changes" comment="pref: 增加Pytorch原生剪枝, 加入MobileNet">
-      <change afterPath="$PROJECT_DIR$/Performance_Comparison.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/modes/distillation_mode.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/PerformanceTest.py" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/core/config.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/config.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/core/controller.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/controller.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/main.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/modes/classification_mode.py" beforeDir="false" afterPath="$PROJECT_DIR$/modes/classification_mode.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/modes/net_MobileNet.py" beforeDir="false" afterPath="$PROJECT_DIR$/net/net_MobileNet.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/modes/prune_mode.py" beforeDir="false" afterPath="$PROJECT_DIR$/modes/prune_mode.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/modes/train_mode.py" beforeDir="false" afterPath="$PROJECT_DIR$/modes/train_mode.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/net/TripletNet.py" beforeDir="false" afterPath="$PROJECT_DIR$/net/TripletNet.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/pruning/Pytorch_prunner.py" beforeDir="false" afterPath="$PROJECT_DIR$/pruning/Pytorch_prunner.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/pruning/TinyML_prunner.py" beforeDir="false" afterPath="$PROJECT_DIR$/pruning/TinyML_prunner.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/plot/confusion_plot.py" beforeDir="false" afterPath="$PROJECT_DIR$/plot/confusion_plot.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -55,7 +50,7 @@
     <setting file="file://$PROJECT_DIR$/core/config.py" root0="FORCE_HIGHLIGHTING" />
   </component>
   <component name="ProblemsViewState">
-    <option name="selectedTabId" value="CurrentFile" />
+    <option name="selectedTabId" value="ProjectErrors" />
   </component>
   <component name="ProjectColorInfo">{
   &quot;customColor&quot;: &quot;&quot;,
@@ -66,42 +61,43 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent">{
-  &quot;keyToString&quot;: {
-    &quot;Python 测试.Python 测试 (pruning_mode.py 内).executor&quot;: &quot;Run&quot;,
-    &quot;Python 测试.Python 测试 (ranker_pruner.py 内).executor&quot;: &quot;Run&quot;,
-    &quot;Python.Performance_Comparison.executor&quot;: &quot;Run&quot;,
-    &quot;Python.TripletNet.executor&quot;: &quot;Run&quot;,
-    &quot;Python.automatic_pruner.executor&quot;: &quot;Run&quot;,
-    &quot;Python.controller.executor&quot;: &quot;Run&quot;,
-    &quot;Python.main.executor&quot;: &quot;Run&quot;,
-    &quot;Python.model_performance_comparison.executor&quot;: &quot;Run&quot;,
-    &quot;Python.prune_plot.executor&quot;: &quot;Run&quot;,
-    &quot;Python.rank_gen.executor&quot;: &quot;Run&quot;,
-    &quot;Python.ranker_pruner.executor&quot;: &quot;Run&quot;,
-    &quot;Python.ranker_prunner.executor&quot;: &quot;Run&quot;,
-    &quot;Python.scratch_3.executor&quot;: &quot;Run&quot;,
-    &quot;RunOnceActivity.OpenProjectViewOnStart&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
-    &quot;WebServerToolWindowFactoryState&quot;: &quot;true&quot;,
-    &quot;git-widget-placeholder&quot;: &quot;Pruning/pref&quot;,
-    &quot;ignore.virus.scanning.warn.message&quot;: &quot;true&quot;,
-    &quot;last_opened_file_path&quot;: &quot;F:/MyDocument/A竞赛科研项目/UAV_code&quot;,
-    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
-    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
-    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
-    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
-    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
-    &quot;settings.editor.selected.configurable&quot;: &quot;com.intellij.pycharm.community.ide.impl.configuration.PythonContentEntriesConfigurable&quot;,
-    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "Python 测试.Python 测试 (pruning_mode.py 内).executor": "Run",
+    "Python 测试.Python 测试 (ranker_pruner.py 内).executor": "Run",
+    "Python.Performance_Comparison.executor": "Run",
+    "Python.TripletNet.executor": "Run",
+    "Python.automatic_pruner.executor": "Run",
+    "Python.controller.executor": "Run",
+    "Python.main.executor": "Run",
+    "Python.model_performance_comparison.executor": "Run",
+    "Python.prune_plot.executor": "Run",
+    "Python.rank_gen.executor": "Run",
+    "Python.ranker_pruner.executor": "Run",
+    "Python.ranker_prunner.executor": "Run",
+    "Python.scratch_3.executor": "Run",
+    "RunOnceActivity.OpenProjectViewOnStart": "true",
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "RunOnceActivity.git.unshallow": "true",
+    "WebServerToolWindowFactoryState": "true",
+    "git-widget-placeholder": "Pruning/pref",
+    "ignore.virus.scanning.warn.message": "true",
+    "last_opened_file_path": "F:/MyDocument/A竞赛科研项目/UAV_code",
+    "node.js.detected.package.eslint": "true",
+    "node.js.detected.package.tslint": "true",
+    "node.js.selected.package.eslint": "(autodetect)",
+    "node.js.selected.package.tslint": "(autodetect)",
+    "nodejs_package_manager_path": "npm",
+    "run.code.analysis.last.selected.profile": "aDefault",
+    "settings.editor.selected.configurable": "com.intellij.pycharm.community.ide.impl.configuration.PythonContentEntriesConfigurable",
+    "vue.rearranger.settings.migration": "true"
   },
-  &quot;keyToStringList&quot;: {
-    &quot;com.intellij.ide.scratch.ScratchImplUtil$2/新建临时文件&quot;: [
-      &quot;Python&quot;
+  "keyToStringList": {
+    "com.intellij.ide.scratch.ScratchImplUtil$2/新建临时文件": [
+      "Python"
     ]
   }
-}</component>
+}]]></component>
   <component name="RecentsManager">
     <key name="MoveFile.RECENT_KEYS">
       <recent name="F:\MyDocument\A竞赛科研项目\LoRa_RFFI\net" />

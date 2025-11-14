@@ -8,6 +8,7 @@ from sklearn.metrics import confusion_matrix, accuracy_score
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.svm import SVC
 
+from core.config import Mode
 from plot.confusion_plot import plot_confusion_matrices
 from training_utils.data_preprocessor import load_generate_triplet, load_model
 from utils.better_print import TextAnimator
@@ -15,8 +16,9 @@ from utils.yaml_handler import update_nested_yaml_entry
 
 
 def test_classification(
-    file_path_enrol,
-    file_path_clf,
+    mode: str=None,
+    file_path_enrol=None,
+    file_path_clf=None,
     dev_range_enrol=None,
     dev_range_clf=None,
     pkt_range_enrol=None,
@@ -25,9 +27,7 @@ def test_classification(
     preprocess_type=None,
     test_list=None,
     model_dir=None,
-    net_name=None,
     pps_for=None,
-    is_pruned=False,
     enable_plots=True,
 ):
     """
@@ -43,9 +43,7 @@ def test_classification(
     :param preprocess_type: 预处理类型
     :param test_list: 测试点列表
     :param model_dir: 模型目录路径
-    :param net_name: 网络名称
     :param pps_for: 预处理类型名称
-    :param is_pruned: 是否剪枝测试（可选）
     :param enable_plots: 控制是否绘图（默认为True）
     """
     # 加载数据
@@ -70,18 +68,17 @@ def test_classification(
     )
     print("\nData loaded!!!")
 
-    # 创建性能记录字典
-    classification_info = {}
     # 定义YAML文件路径（在循环内部定义，确保正确的路径）
     yaml_file_path = os.path.join(model_dir, "performance_records.yaml")
 
     for epoch in test_list or []:
         print()
         print("=============================")
-        if not is_pruned:
-            model_path = os.path.join(model_dir, 'origin')
-        else:
-            model_path = os.path.join(model_dir, 'prune')
+
+        # 子目录路径
+        if mode == Mode.CLASSIFICATION:
+            mode = 'origin'
+        model_path = os.path.join(model_dir, mode)
         # 保存路径
         confusion_save_dir = os.path.join(model_path, f"cft/")
         model_path = os.path.join(model_path, f"Extractor_{epoch}.pth")
@@ -227,17 +224,16 @@ def test_classification(
                 'weight_svm': float(weight_svm)
             }
             # 使用覆盖模式更新测试结果信息
-            model_type = 'pruned' if is_pruned else 'origin'
             update_nested_yaml_entry(
                 yaml_file_path,
-                [f'models', model_type, 'classification_history', f'epoch{epoch}'],
+                [f'models', mode, 'classification_history', f'epoch{epoch}'],
                 classification_info
             )
 
             if enable_plots:
                 # 确保保存目录存在
                 os.makedirs(confusion_save_dir, exist_ok=True)
-                plot_confusion_matrices(wwo_cms, wwo_accs, epoch, net_name, pps_for, vote_size, confusion_save_dir)
+                plot_confusion_matrices(wwo_cms, wwo_accs, epoch, net_type, pps_for, vote_size, confusion_save_dir)
 
             # T-SNE 3D绘图
             # tsne_3d_plot(feature_clf[0],labels=label_clf)

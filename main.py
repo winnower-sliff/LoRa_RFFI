@@ -8,9 +8,8 @@ if __name__ == "__main__":
     # set_seed(42)
 
     # 可以通过修改这里的参数来选择运行模式:
-    # Mode.TRAIN, Mode.CLASSIFICATION, Mode.ROGUE_DEVICE_DETECTION, Mode.PRUNING
-    main(Mode.TRAIN)
-
+    # Mode.TRAIN, Mode.CLASSIFICATION, Mode.ROGUE_DEVICE_DETECTION, Mode.PRUNE, Mode.DISTILLATION
+    main(Mode.DISTILLATION)
 
 
 

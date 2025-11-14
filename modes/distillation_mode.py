@@ -1,0 +1,183 @@
+# \modes\distillation_mode.py
+"""蒸馏模式相关函数"""
+import math
+import os
+from sklearn.model_selection import train_test_split
+from torch.utils.data import DataLoader
+from tqdm import tqdm
+import torch
+import torch.optim as optim
+import torch.nn.functional as F
+import time
+
+from plot.loss_plot import plot_loss_curve
+from training_utils.TripletDataset import TripletDataset, TripletLoss
+from net.TripletNet import TripletNet
+from core.config import DEVICE
+
+
+def distillation(
+    data,
+    labels,
+    teacher_model_path,
+    batch_size=32,
+    num_epochs=200,
+    learning_rate=1e-3,
+    temperature=3.0,
+    alpha=0.7,
+    teacher_net_type=None,
+    student_net_type=None,
+    preprocess_type=None,
+    test_list=None,
+    model_dir_path=None
+):
+    """
+    使用知识蒸馏训练轻量级模型
+
+    :param data: 输入数据
+    :param labels: 输入数据的标签
+    :param teacher_model_path: 教师模型路径
+    :param batch_size: 批处理大小
+    :param num_epochs: 训练轮数
+    :param learning_rate: 学习率
+    :param temperature: 蒸馏温度
+    :param alpha: 蒸馏损失权重
+    :param teacher_net_type: 教师网络类型
+    :param student_net_type: 学生网络类型
+    :param preprocess_type: 预处理类型
+    :param test_list: 测试点列表
+    :param model_dir_path: 模型保存路径
+    """
+
+    # 数据集划分
+    data_train, data_valid, labels_train, labels_valid = train_test_split(
+        data, labels, test_size=0.1, shuffle=True
+    )
+
+    # 生成数据加载器
+    train_dataset = TripletDataset(data_train, labels_train)
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+    batch_num = math.ceil(len(train_dataset) / batch_size)
+
+    # 初始化教师模型
+    teacher_model = TripletNet(net_type=teacher_net_type, in_channels=1 if preprocess_type == 0 else 2)  # RESNET
+    teacher_model.load_state_dict(torch.load(teacher_model_path))
+    teacher_model.to(DEVICE)
+    teacher_model.eval()
+
+    # 初始化学生模型 (MobileNet)
+    student_model = TripletNet(net_type=student_net_type, in_channels=1 if preprocess_type == 0 else 2)  # MobileNet
+    optimizer = optim.Adam(student_model.parameters(), lr=learning_rate)
+    triplet_loss_fn = TripletLoss(margin=0.1)
+
+    # 训练模型
+    student_model.to(DEVICE)
+    student_model.train()
+
+    print(
+        "\n---------------------\n"
+        "Distillation Training\n"
+        "Num of epoch: {}\n"
+        "Batch size: {}\n"
+        "Num of train batch: {}\n"
+        "Temperature: {}\n"
+        "Alpha: {}\n"
+        "---------------------\n".format(num_epochs, batch_size, batch_num, temperature, alpha)
+    )
+    loss_per_epoch = []
+
+    # 总进度条
+    with tqdm(total=num_epochs, desc="Total Progress") as total_bar:
+        for epoch in range(num_epochs):
+            start_time_ep = time.time()
+            total_loss = 0.0
+            # 每一轮训练进度条
+            with tqdm(total=batch_num, desc=f"Epoch {epoch}", leave=False) as pbar:
+                for batch_idx, (anchor, positive, negative) in enumerate(train_loader):
+                    anchor, positive, negative = (
+                        anchor.to(DEVICE),
+                        positive.to(DEVICE),
+                        negative.to(DEVICE),
+                    )
+
+                    # 教师模型前向传播（不计算梯度）
+                    with torch.no_grad():
+                        teacher_anchor, teacher_positive, teacher_negative = teacher_model(
+                            anchor, positive, negative
+                        )
+
+                    # 学生模型前向传播
+                    student_anchor, student_positive, student_negative = student_model(
+                        anchor, positive, negative
+                    )
+
+                    # 三元组损失
+                    triplet_loss = triplet_loss_fn(
+                        student_anchor, student_positive, student_negative
+                    )
+
+                    # 蒸馏损失（使用KL散度）
+                    distill_loss = (
+                        F.kl_div(
+                            F.log_softmax(student_anchor / temperature, dim=1),
+                            F.softmax(teacher_anchor / temperature, dim=1),
+                            reduction='batchmean'
+                        ) +
+                        F.kl_div(
+                            F.log_softmax(student_positive / temperature, dim=1),
+                            F.softmax(teacher_positive / temperature, dim=1),
+                            reduction='batchmean'
+                        ) +
+                        F.kl_div(
+                            F.log_softmax(student_negative / temperature, dim=1),
+                            F.softmax(teacher_negative / temperature, dim=1),
+                            reduction='batchmean'
+                        )
+                    ) * (temperature ** 2)
+
+                    # 总损失
+                    loss = (1 - alpha) * triplet_loss + alpha * distill_loss
+
+                    # 反向传播与优化
+                    optimizer.zero_grad()
+                    loss.backward()
+                    optimizer.step()
+
+                    total_loss += loss.item()
+
+                    pbar.update(1)
+
+            end_time_ep = time.time()
+
+            loss_ep = total_loss / len(train_loader) * 10
+
+            text = (
+                f"Epoch [{epoch+1}/{num_epochs}], "
+                + f"time: {end_time_ep-start_time_ep:.2f}s, "
+                + f"Loss: {loss_ep:.6f}"
+            )
+
+            tqdm.write(text)
+            loss_per_epoch.append(loss_ep)
+
+            # 保存训练好的模型
+            if test_list and (epoch + 1) in test_list:
+                # 创建文件夹&文件
+                if not os.path.exists(model_dir_path):
+                    os.makedirs(model_dir_path)
+                file_name = f"Extractor_{epoch + 1}.pth"
+
+                # 保存模型到指定路径
+                file_path = model_dir_path + file_name
+                torch.save(student_model.state_dict(), file_path)
+                tqdm.write(f"Distilled model saved to {file_path}")
+
+                # 绘制loss折线图
+                if test_list and (epoch + 1) in test_list[-3:]:
+                    pic_save_path = model_dir_path + f"loss_{epoch+1}.png"
+                    plot_loss_curve(loss_per_epoch, num_epochs, "MobileNet", preprocess_type, pic_save_path)
+
+            # 更新总进度条
+            total_bar.update(1)
+    
+    return student_model
