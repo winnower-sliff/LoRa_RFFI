@@ -6,7 +6,7 @@ import os
 
 from matplotlib import pyplot as plt
 from thop import profile
-from core.config import DEVICE
+from core.config import DEVICE, NetworkType
 
 from training_utils.data_preprocessor import load_model
 
@@ -234,8 +234,8 @@ def visualize_all_models_comparison(results, save_path=None):
 # 使用示例
 if __name__ == "__main__":
     # 设置模型目录和参数
-    model_dir = "./model/stft/resnet"  # 模型根目录
-    net_type = 0  # 根据您的网络类型设置
+    model_dir = "./model/stft/mobilenet"  # 模型根目录
+    net_type = NetworkType.MobileNet.value  # 根据您的网络类型设置
     preprocess_type = 0  # 根据您的预处理类型设置
 
     # 遍历分析所有模型
@@ -244,10 +244,12 @@ if __name__ == "__main__":
     # 可选：保存结果到文件
     import json
 
-    with open("model_performance_comparison_results.json", "w") as f:
+    save_path = os.path.join(model_dir, "model_performance_comparison_results.json")
+    with open(save_path, "w") as f:
         json.dump({str(k): v for k, v in results.items()}, f, indent=2)
-    print("\n结果已保存到 model_performance_comparison_results.json")
+    print(f"\n结果已保存到 {save_path}")
 
     # 可视化所有模型的性能对比
-    visualize_all_models_comparison(results, "all_models_comparison.png")
+    save_path = os.path.join(model_dir, "all_models_comparison.png")
+    visualize_all_models_comparison(results, save_path)
 
