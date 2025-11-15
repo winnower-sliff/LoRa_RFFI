@@ -11,6 +11,7 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 from core.config import Config, PRUNED_OUTPUT_DIR, H_VAL, DEVICE
+from experiment_logger import ExperimentLogger
 from modes.classification_mode import test_classification
 from plot.loss_plot import plot_loss_curve
 from pruning.Pytorch_prunner import pytorch_native_prune, remove_pruning_masks_and_apply, \
@@ -55,6 +56,26 @@ def pruning(
     :param use_pytorch_prune: 是否使用PyTorch原生剪枝
     :param target_sparsity: 目标稀疏度 (0-1)
     """
+
+    # 初始化实验记录
+    logger = ExperimentLogger()
+    exp_config = {
+        "mode": "pruning",
+        "model": {
+            "type": net_type,
+            "parameters": {
+                "batch_size": batch_size,
+                "target_sparsity": target_sparsity,
+                "use_pytorch_prune": use_pytorch_prune
+            }
+        },
+        "data": {
+            "preprocess_type": preprocess_type,
+            "test_points": test_list
+        }
+    }
+    exp_filepath, exp_id = logger.create_experiment_record(exp_config)
+
     # 定义YAML文件路径
     yaml_file_path = os.path.join(model_dir, "performance_records.yaml")
 
@@ -64,6 +85,8 @@ def pruning(
         print(">>> 使用 PyTorch 原生剪枝方案 <<<")
     else:
         print(">>> 使用特定的 TinyML 剪枝方案 <<<")
+
+    pruning_results = {}
 
     for exit_epoch in test_list or []:
         print(exit_epoch, test_list)
@@ -146,6 +169,10 @@ def pruning(
                     'timestamp': datetime.now().isoformat()
                 }
 
+                pruning_results[f"epoch_{exit_epoch}"] = {
+                    "pruning_info": pruning_info
+                }
+
                 # 剪枝信息写入：
                 update_nested_yaml_entry(
                     yaml_file_path,
@@ -203,6 +230,11 @@ def pruning(
                     'num_epochs_trained': len(history['loss']) if history and 'loss' in history else 0
                 }
 
+                if f"epoch_{exit_epoch}" in pruning_results:
+                    pruning_results[f"epoch_{exit_epoch}"]["finetune_info"] = finetune_info
+                else:
+                    pruning_results[f"epoch_{exit_epoch}"] = {"finetune_info": finetune_info}
+
                 # 微调信息写入：
                 update_nested_yaml_entry(
                     yaml_file_path,
@@ -214,6 +246,13 @@ def pruning(
                 # 即使跳过微调也需要保存剪枝后的模型
                 torch.save(pruned_model.state_dict(), pruned_model_dir)
                 print("跳过微调步骤，已保存剪枝模型")
+
+    # 记录实验结果
+    final_results = {
+        "pruning": pruning_results,
+        "model_saved_path": model_dir
+    }
+    logger.update_experiment_result(exp_id, final_results)
 
     return
 

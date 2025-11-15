@@ -9,6 +9,7 @@ import torch.optim as optim
 import matplotlib.pyplot as plt
 import time
 
+from experiment_logger import ExperimentLogger
 from plot.loss_plot import plot_loss_curve
 from training_utils.TripletDataset import TripletDataset, TripletLoss
 from net.TripletNet import TripletNet
@@ -41,6 +42,25 @@ def  train(data, labels, batch_size=16, num_epochs=200, learning_rate=1e-3,
     :param test_list: 测试点列表
     :param model_dir_path: 模型保存路径
     """
+
+    # 初始化实验记录
+    logger = ExperimentLogger()
+    exp_config = {
+        "mode": "train",
+        "model": {
+            "type": net_type,
+            "parameters": {
+                "batch_size": batch_size,
+                "epochs": num_epochs,
+                "learning_rate": learning_rate
+            }
+        },
+        "data": {
+            "preprocess_type": preprocess_type,
+            "test_points": test_list
+        }
+    }
+    exp_filepath, exp_id = logger.create_experiment_record(exp_config)
 
     # 数据集划分
     data_train, data_valid, labels_train, labels_valid = train_test_split(
@@ -133,4 +153,15 @@ def  train(data, labels, batch_size=16, num_epochs=200, learning_rate=1e-3,
 
             # 更新总进度条
             total_bar.update(1)
+
+    # 记录实验结果
+    final_results = {
+        "training": {
+            "final_loss": loss_ep,
+            "total_epochs": num_epochs,
+            "model_saved_path": model_dir_path
+        }
+    }
+    logger.update_experiment_result(exp_id, final_results)
+
     return model

@@ -3,12 +3,14 @@ import os
 import time
 from collections import Counter
 
+import numpy as np
 import torch
 from sklearn.metrics import confusion_matrix, accuracy_score
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.svm import SVC
 
 from core.config import Mode
+from experiment_logger import ExperimentLogger
 from plot.confusion_plot import plot_confusion_matrices
 from training_utils.data_preprocessor import load_generate_triplet, load_model
 from utils.better_print import TextAnimator
@@ -17,15 +19,15 @@ from utils.yaml_handler import update_nested_yaml_entry
 
 def test_classification(
     mode: str=None,
-    file_path_enrol=None,
-    file_path_clf=None,
-    dev_range_enrol=None,
-    dev_range_clf=None,
-    pkt_range_enrol=None,
-    pkt_range_clf=None,
+    file_path_enrol: str=None,
+    file_path_clf: str=None,
+    dev_range_enrol: np.array=None,
+    dev_range_clf: np.array=None,
+    pkt_range_enrol: np.array=None,
+    pkt_range_clf: np.array=None,
     net_type=None,
     preprocess_type=None,
-    test_list=None,
+    test_list:list =None,
     model_dir=None,
     pps_for=None,
     enable_plots=True,
@@ -46,6 +48,29 @@ def test_classification(
     :param pps_for: 预处理类型名称
     :param enable_plots: 控制是否绘图（默认为True）
     """
+
+    # 子目录路径
+    if mode == Mode.CLASSIFICATION:
+        mode = 'origin'
+
+    # 初始化实验记录
+    logger = ExperimentLogger()
+    exp_config = {
+        "mode": mode,
+        "model": net_type,
+        "data": {
+            "preprocess_type": preprocess_type,
+            "test_points": test_list,
+            "enrol_file": file_path_enrol,
+            "clf_file": file_path_clf,
+            "dev_range_enrol": [int(dev_range_enrol[0]), int(dev_range_enrol[-1])],
+            "dev_range_clf": [int(dev_range_clf[0]), int(dev_range_clf[-1])],
+            "pkt_range_enrol": [int(pkt_range_enrol[0]), int(pkt_range_enrol[-1])],
+            "pkt_range_clf": [int(pkt_range_clf[0]), int(pkt_range_clf[-1])],
+        }
+    }
+    exp_filepath, exp_id = logger.create_experiment_record(exp_config)
+
     # 加载数据
 
     vote_size = 10
@@ -71,15 +96,14 @@ def test_classification(
     # 定义YAML文件路径（在循环内部定义，确保正确的路径）
     yaml_file_path = os.path.join(model_dir, "performance_records.yaml")
 
+    classification_results = {}
+
     for epoch in test_list or []:
         print()
         print("=============================")
 
-        # 子目录路径
-        if mode == Mode.CLASSIFICATION:
-            mode = 'origin'
-        model_path = os.path.join(model_dir, mode)
         # 保存路径
+        model_path = os.path.join(model_dir, mode)
         confusion_save_dir = os.path.join(model_path, f"cft/")
         model_path = os.path.join(model_path, f"Extractor_{epoch}.pth")
 
@@ -223,6 +247,9 @@ def test_classification(
                 'weight_knn': float(weight_knn),
                 'weight_svm': float(weight_svm)
             }
+
+            classification_results[f"epoch_{epoch}"] = classification_info
+
             # 使用覆盖模式更新测试结果信息
             update_nested_yaml_entry(
                 yaml_file_path,
@@ -238,5 +265,12 @@ def test_classification(
             # T-SNE 3D绘图
             # tsne_3d_plot(feature_clf[0],labels=label_clf)
         print("=============================")
+
+    # 记录实验结果
+    final_results = {
+        "classification": classification_results,
+        "model_dir": model_dir
+    }
+    logger.update_experiment_result(exp_id, final_results)
 
     return

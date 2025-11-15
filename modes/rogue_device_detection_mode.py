@@ -5,6 +5,7 @@ import torch
 from sklearn.metrics import roc_curve, auc
 from sklearn.neighbors import KNeighborsClassifier
 
+from experiment_logger import ExperimentLogger
 from training_utils.data_preprocessor import load_generate_triplet, load_data, generate_spectrogram, load_model
 
 
@@ -49,6 +50,23 @@ def test_rogue_device_detection(
     :return roc_auc (float): ROC 曲线下面积。
     :return eer (float): 等错误率。
     """
+
+    # 初始化实验记录
+    logger = ExperimentLogger()
+    exp_config = {
+        "mode": "rogue_device_detection",
+        "model": {
+            "type": net_type
+        },
+        "data": {
+            "preprocess_type": preprocess_type,
+            "test_points": test_list,
+            "enrol_file": file_path_enrol,
+            "legitimate_file": file_path_legitimate,
+            "rogue_file": file_path_rogue
+        }
+    }
+    exp_filepath, exp_id = logger.create_experiment_record(exp_config)
 
     def _compute_eer(fpr, tpr, thresholds):
         """
@@ -112,6 +130,8 @@ def test_rogue_device_detection(
         torch.tensor(x).unsqueeze(1).float() for x in triplet_data_test
     ]
 
+    detection_results = {}
+
     for epoch in test_list or []:
         print()
         model_path = model_dir_path + f"Extractor_{epoch}.pth"
@@ -148,6 +168,12 @@ def test_rogue_device_detection(
         eer, eer_threshold = _compute_eer(fpr, tpr, thresholds)
         roc_auc = auc(fpr, tpr)
 
+        detection_results[f"epoch_{epoch}"] = {
+            "auc": float(roc_auc),
+            "eer": float(eer),
+            "eer_threshold": float(eer_threshold)
+        }
+
         print("-----------------------------")
         print(f"Extractor ID: {epoch}")
         print(f"AUC = {roc_auc:.3f}, EER = {eer:.3f}")
@@ -162,5 +188,12 @@ def test_rogue_device_detection(
         plt.title(f"ROC Curve After {epoch} Epochs of Training")
         plt.legend(loc="lower right")
         plt.show()
+
+    # 记录实验结果
+    final_results = {
+        "rogue_detection": detection_results,
+        "model_dir_path": model_dir_path
+    }
+    logger.update_experiment_result(exp_id, final_results)
 
     return
