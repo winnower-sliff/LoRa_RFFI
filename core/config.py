@@ -31,6 +31,7 @@ class NetworkType(Enum):
     DRSN = "Drsn"       # 深度残差网路
     MobileNetV1 = "MobileNetV1"  # MobileNetV1网络
     MobileNetV2 = "MobileNetV2"  # MobileNetV1网络
+    LightRsMNV1 = "LightRsMNV1"
 
 
 # 定义预处理类型枚举
@@ -82,6 +83,10 @@ class Config:
 
         if not os.path.exists(self.MODEL_DIR):
             os.makedirs(self.MODEL_DIR)
+        if not os.path.exists(self.TEACHER_MODEL_DIR):
+            os.makedirs(self.TEACHER_MODEL_DIR)
+        if not os.path.exists(self.STUDENT_MODEL_DIR):
+            os.makedirs(self.STUDENT_MODEL_DIR)
 
 
 def set_seed(seed=42):

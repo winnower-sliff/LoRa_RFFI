@@ -161,7 +161,7 @@ def main():
     print("详细准确率数据:", detailed_data)
 
     # 绘制详细对比图
-    plot_epoch_comparison(records, save_path="../reports/detailed_accuracy_comparison.png")
+    plot_epoch_comparison(records, save_path="../experiments/detailed_accuracy_comparison.png")
 
 
 
