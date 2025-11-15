@@ -22,14 +22,24 @@ class TripletNet(nn.Module):
         self.margin = margin
         if net_type == NetworkType.RESNET.value:
             self.embedding_net = FeatureExtractor(in_channels=in_channels)
+
         elif net_type == NetworkType.DRSN.value:
             self.embedding_net = drsnet18(in_channels=in_channels)
-        elif net_type == NetworkType.MobileNet.value:  # 添加 MobileNet 支持
+
+        elif net_type == NetworkType.MobileNetV1.value:  # 添加 MobileNetV1 支持
             width_multiplier = 1 / 16
-            self.embedding_net = mobilenet(in_channels=in_channels, width_multiplier=width_multiplier)
+            self.embedding_net = mobilenet(version='v1', in_channels=in_channels, width_multiplier=width_multiplier)
             # 验证参数量
             total_params = sum(p.numel() for p in self.embedding_net.parameters())
-            print(f"width_multiplier:{width_multiplier} MobileNet 参数量: {total_params}")
+            print(f"width_multiplier:{width_multiplier} MobileNetV2 参数量: {total_params}")
+
+        elif net_type == NetworkType.MobileNetV2.value:  # 添加 MobileNetV2 支持
+            width_multiplier = 1 / 16
+            self.embedding_net = mobilenet(version='v2', in_channels=in_channels, width_multiplier=width_multiplier)
+            # 验证参数量
+            total_params = sum(p.numel() for p in self.embedding_net.parameters())
+            print(f"width_multiplier:{width_multiplier} MobileNetV1 参数量: {total_params}")
+
         elif net_type == 3:
             if use_pytorch_prune:
                 # PyTorch原生剪枝模式：先创建原始网络，稍后应用剪枝

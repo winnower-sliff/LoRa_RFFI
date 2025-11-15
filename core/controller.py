@@ -76,7 +76,7 @@ def run_classification_mode(config):
     test_classification(
         config.mode,
         file_path_enrol="dataset/Train/dataset_training_no_aug.h5",
-        file_path_clf="dataset/Test/dataset_seen_devices.h5 ",
+        file_path_clf="dataset/Test/dataset_seen_devices.h5",
         dev_range_enrol=np.arange(15, 30, dtype=int),
         pkt_range_enrol=np.arange(200, 400, dtype=int),
         dev_range_clf=np.arange(15, 30, dtype=int),
@@ -115,10 +115,7 @@ def run_rogue_device_detection_mode(config):
 def run_pruning_mode(config):
     """剪枝模式"""
 
-    # 0 for all, 1 for only prune, 2 for only test
-    prune_mode = 2
-
-    if prune_mode == 0 or prune_mode == 1:
+    if config.prune_mode == 0 or config.prune_mode == 1:
 
         print_colored_text("剪枝模式", "32")
 
@@ -145,7 +142,7 @@ def run_pruning_mode(config):
             test_list=config.TEST_LIST,
         )
 
-    if prune_mode == 0 or prune_mode == 2:
+    if config.prune_mode == 0 or config.prune_mode == 2:
 
         # 测试最终模型
         print("测试模型...")
@@ -171,10 +168,7 @@ def run_pruning_mode(config):
 def run_distillation_mode(config):
     """蒸馏模式"""
 
-    # 0 for all, 1 for only distillate, 2 for only test
-    distillate_mode = 2
-
-    if distillate_mode == 0 or distillate_mode == 1:
+    if config.distillate_mode == 0 or config.distillate_mode == 1:
 
         print_colored_text("蒸馏模式", "32")
 
@@ -195,7 +189,7 @@ def run_distillation_mode(config):
         distillation(
             data,
             labels,
-            teacher_model_path=config.TEACHER_MODEL_DIR + "/origin/Extractor_200.pth",  # 默认使用第200轮的模型
+            teacher_model_path=config.TEACHER_MODEL_DIR + "origin/Extractor_200.pth",  # 默认使用第200轮的模型
             num_epochs=max(config.TEST_LIST),
             temperature=3.0,
             alpha=0.7,
@@ -203,10 +197,10 @@ def run_distillation_mode(config):
             student_net_type=config.STUDENT_NET_TYPE,
             preprocess_type=config.PROPRECESS_TYPE,
             test_list=config.TEST_LIST,
-            model_dir_path=config.DISTILLED_MODEL_DIR,
+            model_dir_path=config.STUDENT_MODEL_DIR + "distillation/",
         )
 
-    if distillate_mode == 0 or distillate_mode == 2:
+    if config.distillate_mode == 0 or config.distillate_mode == 2:
 
         # 测试最终模型
         print("测试模型...")
@@ -217,9 +211,9 @@ def run_distillation_mode(config):
             config.mode,
             file_path_enrol="dataset/Train/dataset_training_no_aug.h5",
             file_path_clf="dataset/Test/dataset_seen_devices.h5 ",
-            dev_range_enrol=np.arange(15, 30, dtype=int),
+            dev_range_enrol=np.arange(0, 30, dtype=int),
             pkt_range_enrol=np.arange(200, 400, dtype=int),
-            dev_range_clf=np.arange(15, 30, dtype=int),
+            dev_range_clf=np.arange(0, 30, dtype=int),
             pkt_range_clf=np.arange(0, 200, dtype=int),
             net_type=config.STUDENT_NET_TYPE,
             preprocess_type=config.PROPRECESS_TYPE,

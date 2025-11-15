@@ -27,9 +27,10 @@ class Mode:
 
 # 定义网络类型枚举
 class NetworkType(Enum):
-    RESNET = "resnet"      # 残差网络
-    DRSN = "drsn"       # 深度残差网路
-    MobileNet = "mobilenet"  # MobileNet网络
+    RESNET = "ResNet"      # 残差网络
+    DRSN = "Drsn"       # 深度残差网路
+    MobileNetV1 = "MobileNetV1"  # MobileNetV1网络
+    MobileNetV2 = "MobileNetV2"  # MobileNetV1网络
 
 
 # 定义预处理类型枚举
@@ -47,9 +48,13 @@ class Config:
         # 设置网络类型
         self.NET_TYPE = NetworkType.RESNET.value
         self.TEACHER_NET_TYPE = NetworkType.RESNET.value
-        self.STUDENT_NET_TYPE = NetworkType.MobileNet.value
+        self.STUDENT_NET_TYPE = NetworkType.MobileNetV2.value
         # 0 for stft, 1 for wst
         self.PROPRECESS_TYPE = PreprocessType.STFT.value
+        # 0 for all, 1 for only prune, 2 for only test
+        self.prune_mode = 0
+        # 0 for all, 1 for only distillate, 2 for only test
+        self.distillate_mode = 0
         # 我们需要一个新的训练文件吗？
         self.new_file_flag = 1
 
