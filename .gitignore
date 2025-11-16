@@ -9,3 +9,9 @@
 *.pth
 *.csv
 *.pyc
+
+# IntelliJ IDEA / PyCharm / WebStorm
+.idea/
+*.iml
+workspace.xml
+tasks.xml
