@@ -73,7 +73,7 @@ def  train(data, labels, batch_size=16, num_epochs=200, learning_rate=1e-3,
     batch_num = math.ceil(len(train_dataset) / batch_size)
 
     # 初始化模型和优化器
-    model = TripletNet(net_type=net_type, in_channels=1 if preprocess_type == 0 else 2)
+    model = TripletNet(net_type=net_type, in_channels=preprocess_type.in_channels)
     optimizer = optim.Adam(model.parameters(), lr=learning_rate)
     loss_fn = TripletLoss(margin=0.1)
 

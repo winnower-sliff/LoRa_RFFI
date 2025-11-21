@@ -40,12 +40,19 @@ class TripletNet(nn.Module):
             total_params = sum(p.numel() for p in self.embedding_net.parameters())
             print(f"width_multiplier:{width_multiplier} {NetworkType.MobileNetV2.value} 参数量: {total_params}")
 
-        elif net_type == NetworkType.LightRsMNV1.value:
+        elif net_type == NetworkType.LightNet1.value:
             width_multiplier = 1 / 16
             self.embedding_net = mobilenet(version='lightV1', in_channels=in_channels, width_multiplier=width_multiplier)
             # 验证参数量
             total_params = sum(p.numel() for p in self.embedding_net.parameters())
             print(f"width_multiplier:{width_multiplier} {NetworkType.LightRsMNV1.value} 参数量: {total_params}")
+
+        elif net_type == NetworkType.LightNet2.value:
+            width_multiplier = 1 / 16
+            self.embedding_net = mobilenet(version='lightV2', in_channels=in_channels, width_multiplier=width_multiplier)
+            # 验证参数量
+            total_params = sum(p.numel() for p in self.embedding_net.parameters())
+            print(f"width_multiplier:{width_multiplier} {NetworkType.LightRsMNV2.value} 参数量: {total_params}")
 
         elif net_type == 3:
             if use_pytorch_prune:

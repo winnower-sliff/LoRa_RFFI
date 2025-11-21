@@ -23,6 +23,7 @@ class Mode:
     ROGUE_DEVICE_DETECTION = "rogue_device_detection"
     PRUNE = "prune"
     DISTILLATION = "distillation"
+    PTQ = "ptq"
 
 
 # 定义网络类型枚举
@@ -30,14 +31,20 @@ class NetworkType(Enum):
     RESNET = "ResNet"      # 残差网络
     DRSN = "Drsn"       # 深度残差网路
     MobileNetV1 = "MobileNetV1"  # MobileNetV1网络
-    MobileNetV2 = "MobileNetV2"  # MobileNetV1网络
-    LightRsMNV1 = "LightRsMNV1"
+    MobileNetV2 = "MobileNetV2"  # MobileNetV2网络
+    LightNet1 = "LightNet1"     # MobileNetV1改进网络
+    LightNet2 = "LightNet2"     # LightNetV1改进网络
 
 
 # 定义预处理类型枚举
 class PreprocessType(Enum):
-    STFT = 0          # 短时傅里叶变换
-    WST = 1           # 小波散射变换
+    IQ = ("IQ", 2)  # IQ数据直接使用，2个通道（I和Q）
+    STFT = ("STFT", 1)  # 短时傅里叶变换，1个通道（幅度）
+    WST = ("WST", 2)  # 小波散射变换，2个通道（实部和虚部）
+
+    def __init__(self, name, in_channels):
+        self._value_ = name
+        self.in_channels = in_channels
 
 
 
@@ -48,14 +55,15 @@ class Config:
         self.mode = mode
         # 设置网络类型
         self.NET_TYPE = NetworkType.RESNET.value
+        # 教师网络类型, 学生网络类型
         self.TEACHER_NET_TYPE = NetworkType.RESNET.value
         self.STUDENT_NET_TYPE = NetworkType.MobileNetV2.value
-        # 0 for stft, 1 for wst
-        self.PROPRECESS_TYPE = PreprocessType.STFT.value
+        # 数据预处理类型
+        self.PROPRECESS_TYPE = PreprocessType.STFT
         # 0 for all, 1 for only prune, 2 for only test
         self.prune_mode = 0
-        # 0 for all, 1 for only distillate, 2 for only test
-        self.distillate_mode = 0
+        # 0 for all, 1 for only distillate, 2 for only Fine-tuning, 3 for only test
+        self.distillate_mode = 3
         # 我们需要一个新的训练文件吗？
         self.new_file_flag = 1
 
@@ -66,7 +74,7 @@ class Config:
 
         # 后续设置
 
-        if self.PROPRECESS_TYPE == PreprocessType.STFT.value:
+        if self.PROPRECESS_TYPE == PreprocessType.STFT:
             self.PPS_FOR = "stft"
             self.MODEL_DIR= f"./model/{self.PPS_FOR}/{self.NET_TYPE}/"
             self.TEACHER_MODEL_DIR = f"./model/{self.PPS_FOR}/{self.TEACHER_NET_TYPE}/"

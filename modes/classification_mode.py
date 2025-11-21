@@ -28,9 +28,11 @@ def test_classification(
     net_type=None,
     preprocess_type=None,
     test_list:list =None,
+    snr_range=None,
     model_dir=None,
     pps_for=None,
     enable_plots=True,
+    is_quantized_model=False,
 ):
     """
     * 使用给定的特征提取模型(从指定路径加载)对注册数据集和分类数据集进行分类测试。
@@ -84,17 +86,20 @@ def test_classification(
     # 加载注册数据集(IQ样本和标签)
     print("\nData loading...")
     label_enrol, triplet_data_enrol = load_generate_triplet(
-        file_path_enrol, dev_range_enrol, pkt_range_enrol, preprocess_type
+        file_path_enrol, dev_range_enrol, pkt_range_enrol,
+        preprocess_type, snr_range=snr_range
     )
 
     # 加载分类数据集(IQ样本和标签)
     label_clf, triplet_data_clf = load_generate_triplet(
-        file_path_clf, dev_range_clf, pkt_range_clf, preprocess_type
+        file_path_clf, dev_range_clf, pkt_range_clf,
+        preprocess_type, snr_range=snr_range
     )
     print("\nData loaded!!!")
 
     # 定义YAML文件路径（在循环内部定义，确保正确的路径）
     yaml_file_path = os.path.join(model_dir, "performance_records.yaml")
+    model_dir = os.path.join(model_dir, mode)
 
     classification_results = {}
 
@@ -103,15 +108,15 @@ def test_classification(
         print("=============================")
 
         # 保存路径
-        model_path = os.path.join(model_dir, mode)
-        confusion_save_dir = os.path.join(model_path, f"cft/")
-        model_path = os.path.join(model_path, f"Extractor_{epoch}.pth")
+
+        confusion_save_dir = os.path.join(model_dir, f"cft/")
+        model_path = os.path.join(model_dir, f"Extractor_{epoch}.pth")
 
 
         if not os.path.exists(model_path):
             print(f"{model_path} isn't exist")
         else:
-            model = load_model(model_path, net_type, preprocess_type)
+            model = load_model(model_path, net_type, preprocess_type, is_quantized_model=is_quantized_model)
             print("Model loaded!!!")
 
             # 提取特征

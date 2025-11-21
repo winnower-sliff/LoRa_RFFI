@@ -14,9 +14,9 @@ from core.config import Config, PRUNED_OUTPUT_DIR, H_VAL, DEVICE
 from experiment_logger import ExperimentLogger
 from modes.classification_mode import test_classification
 from plot.loss_plot import plot_loss_curve
-from pruning.Pytorch_prunner import pytorch_native_prune, remove_pruning_masks_and_apply, \
+from pruning_utils.Pytorch_prunner import pytorch_native_prune, remove_pruning_masks_and_apply, \
     compute_pruning_rates, pytorch_prune_model
-from pruning.TinyML_prunner import extract_weight, automatic_pruner_pytorch, TinyML_prune_model
+from pruning_utils.TinyML_prunner import extract_weight, automatic_pruner_pytorch, TinyML_prune_model
 from training_utils.TripletDataset import TripletDataset, TripletLoss
 from training_utils.data_preprocessor import load_model
 from utils.better_print import print_colored_text
@@ -109,19 +109,15 @@ def pruning(
             print("\n加载数据...")
 
             # 数据集划分
-            data_train, data_temp, labels_train, labels_temp = train_test_split(
-                data, labels, test_size=0.3, shuffle=True, random_state=42
-            )
-            data_valid, data_test, labels_valid, labels_test = train_test_split(
-                data_temp, labels_temp, test_size=0.333, shuffle=True, random_state=42
+            data_train, data_valid, labels_train, labels_valid = train_test_split(
+                data, labels, test_size=0.1, shuffle=True, random_state=42
             )
 
             if verbose:
-                tot = data_train.shape[0] + data_valid.shape[0] + data_test.shape[0]
+                tot = data_train.shape[0] + data_valid.shape[0]
                 print(f"  - 总IQ轨迹数: {tot}")
                 print(f"  - 训练数据形状: {data_train.shape}")
                 print(f"  - 验证数据形状: {data_valid.shape}")
-                print(f"  - 测试数据形状: {data_test.shape}")
 
             prune_start = datetime.now()
 
@@ -285,6 +281,14 @@ def finetune_model(
     :param verbose: 详细输出级别 (0: 静默, 1: 基本信息, 2: 详细信息)
     """
 
+    # 参数配置
+    patience = 10
+    patience_counter = 0
+    model.to(DEVICE)
+    best_val_loss = float('inf')
+    num_epochs = 150
+    learning_rate=1e-4
+
     # 数据加载器
     train_dataset = TripletDataset(data_train, labels_train)
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
@@ -292,17 +296,10 @@ def finetune_model(
     valid_loader = DataLoader(valid_dataset, batch_size=batch_size)
 
     # 优化器和损失函数
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
     loss_fn = TripletLoss(margin=0.1)
 
-    model.to(DEVICE)
-    best_val_loss = float('inf')
-
-    num_epochs = 150
     batch_num = math.ceil(len(train_dataset) / batch_size)
-
-    patience = 10
-    patience_counter = 0
 
 
     print(

@@ -14,7 +14,8 @@ from experiment_logger import ExperimentLogger
 from plot.loss_plot import plot_loss_curve
 from training_utils.TripletDataset import TripletDataset, TripletLoss
 from net.TripletNet import TripletNet
-from core.config import DEVICE
+from core.config import DEVICE, PreprocessType
+from training_utils.data_preprocessor import generate_spectrogram
 
 
 def distillation(
@@ -84,13 +85,13 @@ def distillation(
     batch_num = math.ceil(len(train_dataset) / batch_size)
 
     # 初始化教师模型
-    teacher_model = TripletNet(net_type=teacher_net_type, in_channels=1 if preprocess_type == 0 else 2)  # RESNET
+    teacher_model = TripletNet(net_type=teacher_net_type, in_channels=preprocess_type.in_channels)  # RESNET
     teacher_model.load_state_dict(torch.load(teacher_model_path))
     teacher_model.to(DEVICE)
     teacher_model.eval()
 
     # 初始化学生模型 (MobileNet)
-    student_model = TripletNet(net_type=student_net_type, in_channels=1 if preprocess_type == 0 else 2)  # MobileNet
+    student_model = TripletNet(net_type=student_net_type, in_channels=preprocess_type.in_channels)  # MobileNet
     optimizer = optim.Adam(student_model.parameters(), lr=learning_rate)
     triplet_loss_fn = TripletLoss(margin=0.1)
 
@@ -217,3 +218,131 @@ def distillation(
     logger.update_experiment_result(exp_id, final_results)
 
     return student_model
+
+
+def finetune_with_awgn(
+    data,
+    labels,
+    pretrained_model_path,
+    snr_range,  # 噪声范围，例如 [0, 30] 表示SNR在0到30dB之间
+    batch_size=32,
+    num_epochs=50,
+    learning_rate=1e-4,  # 微调时通常使用更小的学习率
+    net_type=None,
+    preprocess_type=None,
+    test_list=None,
+    model_dir_path=None
+):
+    """
+    使用加了AWGN的IQ数据对预训练模型进行微调
+
+    :param data: 输入IQ数据
+    :param labels: 数据标签
+    :param pretrained_model_path: 预训练模型路径
+    :param snr_range: SNR范围 [min_snr, max_snr]
+    :param batch_size: 批处理大小
+    :param num_epochs: 微调轮数
+    :param learning_rate: 学习率
+    :param net_type: 网络类型
+    :param preprocess_type: 预处理类型
+    :param test_list: 测试点列表
+    :param model_dir_path: 模型保存路径
+    """
+
+    from utils.signal_trans import awgn
+    from sklearn.model_selection import train_test_split
+    from torch.utils.data import DataLoader
+    import math
+
+    # 添加噪声到数据
+    noisy_data = awgn(data, snr_range)
+    noisy_data = generate_spectrogram(noisy_data, preprocess_type)
+
+    # 数据集划分
+    data_train, data_valid, labels_train, labels_valid = train_test_split(
+        noisy_data, labels, test_size=0.1, shuffle=True
+    )
+
+    # 生成数据加载器
+    train_dataset = TripletDataset(data_train, labels_train)
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+    batch_num = math.ceil(len(train_dataset) / batch_size)
+
+    # 加载预训练模型
+    model = TripletNet(net_type=net_type, in_channels=preprocess_type.in_channels)
+    model.load_state_dict(torch.load(pretrained_model_path))
+    model.to(DEVICE)
+    model.train()
+
+    # 设置优化器
+    optimizer = optim.Adam(model.parameters(), lr=learning_rate)
+    triplet_loss_fn = TripletLoss(margin=0.1)
+
+    print(
+        "\n---------------------\n"
+        "Fine-tuning with AWGN\n"
+        "Num of epoch: {}\n"
+        "Batch size: {}\n"
+        "SNR Range: {}~{} dB\n"
+        "---------------------\n".format(num_epochs, batch_size, snr_range[0], snr_range[1])
+    )
+
+    loss_per_epoch = []
+
+    # 训练过程
+    with tqdm(total=num_epochs, desc="Total Progress") as total_bar:
+        for epoch in range(num_epochs):
+            start_time_ep = time.time()
+            total_loss = 0.0
+
+            with tqdm(total=batch_num, desc=f"Epoch {epoch}", leave=False) as pbar:
+                for batch_idx, (anchor, positive, negative) in enumerate(train_loader):
+                    anchor, positive, negative = (
+                        anchor.to(DEVICE),
+                        positive.to(DEVICE),
+                        negative.to(DEVICE),
+                    )
+
+                    # 前向传播
+                    embedded_anchor, embedded_positive, embedded_negative = model(
+                        anchor, positive, negative
+                    )
+
+                    # 计算损失
+                    loss = triplet_loss_fn(embedded_anchor, embedded_positive, embedded_negative)
+
+                    # 反向传播与优化
+                    optimizer.zero_grad()
+                    loss.backward()
+                    # 梯度裁剪，防止大的更新
+                    torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+                    optimizer.step()
+
+                    total_loss += loss.item()
+                    pbar.update(1)
+
+            end_time_ep = time.time()
+            loss_ep = total_loss / len(train_loader) * 10
+
+            text = (
+                f"Epoch [{epoch+1}/{num_epochs}], "
+                + f"time: {end_time_ep-start_time_ep:.2f}s, "
+                + f"Loss: {loss_ep:.6f}"
+            )
+
+            tqdm.write(text)
+            loss_per_epoch.append(loss_ep)
+
+            # 保存模型
+            if test_list and (epoch + 1) in test_list:
+                if not os.path.exists(model_dir_path):
+                    os.makedirs(model_dir_path)
+                file_name = f"Finetuned_Extractor_SNR{snr_range[0]}-{snr_range[1]}dB_{epoch + 1}.pth"
+                file_path = os.path.join(model_dir_path, file_name)
+                torch.save(model.state_dict(), file_path)
+                tqdm.write(f"Fine-tuned model saved to {file_path}")
+
+            total_bar.update(1)
+
+    return model
+

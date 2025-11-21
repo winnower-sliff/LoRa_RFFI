@@ -1,12 +1,14 @@
 import numpy as np
+import torch
 
 # 从配置模块导入配置、设备和模式枚举
-from core.config import Config, Mode
+from core.config import Config, Mode, PreprocessType
 from modes.classification_mode import test_classification
 from modes.prune_mode import pruning
+from modes.ptq_mode import ptq_quantization, print_quantization_info
 from modes.rogue_device_detection_mode import test_rogue_device_detection
 from modes.train_mode import train
-from modes.distillation_mode import distillation
+from modes.distillation_mode import distillation, finetune_with_awgn
 from training_utils.data_preprocessor import prepare_train_data
 from utils.better_print import print_colored_text
 
@@ -30,6 +32,7 @@ def main(mode=Mode.TRAIN):
         Mode.ROGUE_DEVICE_DETECTION: run_rogue_device_detection_mode,
         Mode.PRUNE: run_pruning_mode,
         Mode.DISTILLATION: run_distillation_mode,
+        Mode.PTQ: run_ptq_mode,
     }
 
     # 执行对应模式的函数
@@ -84,6 +87,7 @@ def run_classification_mode(config):
         net_type=config.NET_TYPE,
         preprocess_type=config.PROPRECESS_TYPE,
         test_list=config.TEST_LIST,
+        # snr_range=np.arange(10, 20),
         model_dir=config.MODEL_DIR,
         pps_for=config.PPS_FOR,
     )
@@ -111,6 +115,7 @@ def run_rogue_device_detection_mode(config):
         wst_j=config.WST_J,
         wst_q=config.WST_Q,
     )
+
 
 def run_pruning_mode(config):
     """剪枝模式"""
@@ -186,7 +191,7 @@ def run_distillation_mode(config):
         )
 
         # 执行蒸馏训练
-        distillation(
+        student_model = distillation(
             data,
             labels,
             teacher_model_path=config.TEACHER_MODEL_DIR + "origin/Extractor_200.pth",  # 默认使用第200轮的模型
@@ -201,6 +206,40 @@ def run_distillation_mode(config):
         )
 
     if config.distillate_mode == 0 or config.distillate_mode == 2:
+
+        # 准备训练数据
+        data, labels = prepare_train_data(
+            config.new_file_flag,
+            config.filename_train_prepared_data,
+            path_train_original_data="dataset/Train/dataset_training_no_aug.h5",
+            dev_range=np.arange(0, 40, dtype=int),
+            pkt_range=np.arange(0, 800, dtype=int),
+            snr_range=np.arange(10, 40),
+            generate_type=PreprocessType.IQ,
+            WST_J=config.WST_J,
+            WST_Q=config.WST_Q,
+        )
+
+        # 微调阶段 - 使用不同SNR级别的噪声数据
+        # snr_levels = [[30, 40], [20, 30], [10, 20], [0, 10]]  # 可以定义多个SNR范围
+        snr_levels = [[20, 30], [10, 20], [0, 10]]  # 可以定义多个SNR范围
+
+        for snr_range in snr_levels:
+            finetuned_model = finetune_with_awgn(
+                data=data,
+                labels=labels,
+                pretrained_model_path='./model/stft/LightRsMNV1/distillation/Extractor_best1.pth',
+                snr_range=snr_range,
+                batch_size=64,
+                num_epochs=50,  # 微调轮数可以较少
+                learning_rate=1e-3,  # 较小学习率
+                net_type=config.STUDENT_NET_TYPE,
+                preprocess_type=config.PROPRECESS_TYPE,
+                test_list=[10, 20, 30, 50],
+                model_dir_path='./model/stft/LightRsMNV1/distillation'
+            )
+
+    if config.distillate_mode == 0 or config.distillate_mode == 3:
 
         # 测试最终模型
         print("测试模型...")
@@ -218,6 +257,63 @@ def run_distillation_mode(config):
             net_type=config.STUDENT_NET_TYPE,
             preprocess_type=config.PROPRECESS_TYPE,
             test_list=config.TEST_LIST,
+            snr_range=np.arange(10, 20),
             model_dir=config.STUDENT_MODEL_DIR,
             pps_for=config.PPS_FOR,
         )
+
+
+def run_ptq_mode(config):
+    """PTQ量化模式"""
+
+    print_colored_text("PTQ模式", "32")
+
+    data, labels = prepare_train_data(
+        config.new_file_flag,
+        config.filename_train_prepared_data,
+        path_train_original_data="dataset/Train/dataset_training_no_aug.h5",
+        dev_range=np.arange(0, 10, dtype=int),
+        pkt_range=np.arange(0, 300, dtype=int),
+        snr_range=np.arange(20, 80),
+        generate_type=config.PROPRECESS_TYPE,
+        WST_J=config.WST_J,
+        WST_Q=config.WST_Q,
+    )
+
+    # 执行PTQ量化
+    data = torch.from_numpy(data).to('cpu')
+    data = data.to(dtype=torch.float32)
+    quantized_model = ptq_quantization(
+        data=data,
+        labels=labels,
+        model_path=config.MODEL_DIR + "distillation/Extractor_20.pth",
+        net_type=config.NET_TYPE,
+        preprocess_type=config.PROPRECESS_TYPE,
+        output_path=config.MODEL_DIR + "/ptq/",
+    )
+
+    # 打印量化信息
+    print_quantization_info(quantized_model)
+
+    # 测试最终模型
+    print("测试模型...")
+    print_colored_text("PTQ后的分类模式", "32")
+
+    # 执行分类测试
+    test_classification(
+        config.mode,
+        file_path_enrol="dataset/Train/dataset_training_no_aug.h5",
+        file_path_clf="dataset/Test/dataset_seen_devices.h5 ",
+        dev_range_enrol=np.arange(0, 30, dtype=int),
+        pkt_range_enrol=np.arange(200, 400, dtype=int),
+        dev_range_clf=np.arange(0, 30, dtype=int),
+        pkt_range_clf=np.arange(0, 200, dtype=int),
+        net_type=config.STUDENT_NET_TYPE,
+        preprocess_type=config.PROPRECESS_TYPE,
+        test_list=config.TEST_LIST,
+        # snr_range=np.arange(20, 30),
+        model_dir=config.STUDENT_MODEL_DIR,
+        pps_for=config.PPS_FOR,
+        is_quantized_model=True,
+    )
+

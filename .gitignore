@@ -7,10 +7,13 @@
 *.png
 # 忽略所有模型文件
 *.pth
+*.pt
+# 忽略所有数据文件
+*.yaml
 *.csv
-*.pyc
 
 # IntelliJ IDEA / PyCharm / WebStorm
+*.pyc
 .idea/
 *.iml
 workspace.xml
