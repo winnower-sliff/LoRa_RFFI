@@ -12,8 +12,20 @@ DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # 剪枝相关的配置
 H_VAL = 10  # 剪枝的粒度, 即决定剪枝的激进程度
-PRUNED_OUTPUT_DIR = "./pruning_results/"  # 剪枝相关文件存放
-CUSTOM_PRUNING_FILE = os.path.join(PRUNED_OUTPUT_DIR, "1-pr.csv")
+PRUNED_DATA_DIR = "./experiments/pruning_results/"  # 剪枝相关文件存放
+CUSTOM_PRUNING_FILE = os.path.join(PRUNED_DATA_DIR, "1-pr.csv")
+# PCA相关的配置
+PCA_DATA_DIR = "./experiments/pca_results/"
+PCA_FILE_INPUT = os.path.join(PCA_DATA_DIR, "teacher_feats.npz")
+PCA_FILE_OUTPUT = os.path.join(PCA_DATA_DIR, "pca_16.npz")
+
+PCA_DIM_TRAIN = 16
+PCA_DIM_TEST = 16
+
+if not os.path.exists(PRUNED_DATA_DIR):
+    os.makedirs(PRUNED_DATA_DIR)
+if not os.path.exists(PCA_DATA_DIR):
+    os.makedirs(PCA_DATA_DIR)
 
 
 # 定义运行模式的枚举
@@ -23,7 +35,7 @@ class Mode:
     ROGUE_DEVICE_DETECTION = "rogue_device_detection"
     PRUNE = "prune"
     DISTILLATION = "distillation"
-    PTQ = "ptq"
+    TEST = "test"
 
 
 # 定义网络类型枚举
@@ -32,8 +44,8 @@ class NetworkType(Enum):
     DRSN = "Drsn"       # 深度残差网路
     MobileNetV1 = "MobileNetV1"  # MobileNetV1网络
     MobileNetV2 = "MobileNetV2"  # MobileNetV2网络
-    LightNet1 = "LightNet1"     # MobileNetV1改进网络
-    LightNet2 = "LightNet2"     # LightNetV1改进网络
+    LightNetV1 = "LightNetV1"     # MobileNetV1改进网络
+    LightNetV2 = "LightNetV2"     # LightNetV1改进网络
 
 
 # 定义预处理类型枚举
@@ -54,16 +66,20 @@ class Config:
         # 设置模式
         self.mode = mode
         # 设置网络类型
-        self.NET_TYPE = NetworkType.RESNET.value
+        self.NET_TYPE = NetworkType.LightNetV1
         # 教师网络类型, 学生网络类型
-        self.TEACHER_NET_TYPE = NetworkType.RESNET.value
-        self.STUDENT_NET_TYPE = NetworkType.MobileNetV2.value
+        self.TEACHER_NET_TYPE = NetworkType.RESNET
+        self.STUDENT_NET_TYPE = NetworkType.LightNetV1
         # 数据预处理类型
         self.PROPRECESS_TYPE = PreprocessType.STFT
         # 0 for all, 1 for only prune, 2 for only test
-        self.prune_mode = 0
+        self.PRUNE_MODE = 0
         # 0 for all, 1 for only distillate, 2 for only Fine-tuning, 3 for only test
-        self.distillate_mode = 3
+        self.DISTILLATE_MODE = 3
+        # 蒸馏训练是否使用PCA
+        self.IS_PCA_TRAIN = True
+        # 测试时是否使用PCA
+        self.IS_PCA_TEST = True
         # 我们需要一个新的训练文件吗？
         self.new_file_flag = 1
 
@@ -76,9 +92,9 @@ class Config:
 
         if self.PROPRECESS_TYPE == PreprocessType.STFT:
             self.PPS_FOR = "stft"
-            self.MODEL_DIR= f"./model/{self.PPS_FOR}/{self.NET_TYPE}/"
-            self.TEACHER_MODEL_DIR = f"./model/{self.PPS_FOR}/{self.TEACHER_NET_TYPE}/"
-            self.STUDENT_MODEL_DIR = f"./model/{self.PPS_FOR}/{self.STUDENT_NET_TYPE}/"
+            self.MODEL_DIR= f"./model/{self.PPS_FOR}/{self.NET_TYPE.value}/"
+            self.TEACHER_MODEL_DIR = f"./model/{self.PPS_FOR}/{self.TEACHER_NET_TYPE.value}/"
+            self.STUDENT_MODEL_DIR = f"./model/{self.PPS_FOR}/{self.STUDENT_NET_TYPE.value}/"
             self.filename_train_prepared_data = f"train_data_{self.PPS_FOR}.h5"
         else:
             self.PPS_FOR = "wst"

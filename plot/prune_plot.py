@@ -1,7 +1,6 @@
 
-import yaml
 import matplotlib.pyplot as plt
-import numpy as np
+import yaml
 
 
 def extract_accuracy_data(results, min_epoch=50):

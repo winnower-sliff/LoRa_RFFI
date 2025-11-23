@@ -1,8 +1,9 @@
 import os
-import yaml
-import matplotlib.pyplot as plt
-import numpy as np
 from typing import List, Dict, Any
+
+import matplotlib.pyplot as plt
+import yaml
+
 
 def load_experiment_records(log_dir: str) -> List[Dict[Any, Any]]:
     """

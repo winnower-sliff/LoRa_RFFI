@@ -2,6 +2,8 @@
 """蒸馏模式相关函数"""
 import math
 import os
+
+import numpy as np
 from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader
 from tqdm import tqdm
@@ -14,7 +16,7 @@ from experiment_logger import ExperimentLogger
 from plot.loss_plot import plot_loss_curve
 from training_utils.TripletDataset import TripletDataset, TripletLoss
 from net.TripletNet import TripletNet
-from core.config import DEVICE, PreprocessType
+from core.config import DEVICE, PCA_FILE_OUTPUT
 from training_utils.data_preprocessor import generate_spectrogram
 
 
@@ -31,7 +33,8 @@ def distillation(
     student_net_type=None,
     preprocess_type=None,
     test_list=None,
-    model_dir_path=None
+    model_dir_path=None,
+    is_pca=True,
 ):
     """
     使用知识蒸馏训练轻量级模型
@@ -49,6 +52,7 @@ def distillation(
     :param preprocess_type: 预处理类型
     :param test_list: 测试点列表
     :param model_dir_path: 模型保存路径
+    :param is_pca: 是否使用PCA降维处理特征（默认为True）
     """
 
     # 初始化实验记录
@@ -56,8 +60,8 @@ def distillation(
     exp_config = {
         "mode": "distillation",
         "model": {
-            "teacher_type": teacher_net_type,
-            "student_type": student_net_type,
+            "teacher_type": teacher_net_type.value,
+            "student_type": student_net_type.value,
             "parameters": {
                 "batch_size": batch_size,
                 "epochs": num_epochs,
@@ -73,6 +77,14 @@ def distillation(
         }
     }
     exp_filepath, exp_id = logger.create_experiment_record(exp_config)
+
+    if is_pca:
+        # 加载 PCA
+        pca = np.load(PCA_FILE_OUTPUT)
+        W = torch.tensor(pca['components'].T, dtype=torch.float32).to(DEVICE)  # D_t x d
+        mean = torch.tensor(pca['mean'], dtype=torch.float32).to(DEVICE)
+        d = W.shape[1]
+        print("PCA data loaded!!!")
 
     # 数据集划分
     data_train, data_valid, labels_train, labels_valid = train_test_split(
@@ -107,7 +119,8 @@ def distillation(
         "Num of train batch: {}\n"
         "Temperature: {}\n"
         "Alpha: {}\n"
-        "---------------------\n".format(num_epochs, batch_size, batch_num, temperature, alpha)
+        "PCA: {}\n"
+        "---------------------\n".format(num_epochs, batch_size, batch_num, temperature, alpha, is_pca)
     )
     loss_per_epoch = []
 
@@ -125,11 +138,23 @@ def distillation(
                         negative.to(DEVICE),
                     )
 
+                    # 对特征进行PCA降维和归一化处理
+                    def process_pca_features(feature):
+                        f_centered = feature - mean.unsqueeze(0)
+                        f_pca = f_centered @ W  # B x d
+                        return F.normalize(f_pca, p=2, dim=1)
+
                     # 教师模型前向传播（不计算梯度）
                     with torch.no_grad():
                         teacher_anchor, teacher_positive, teacher_negative = teacher_model(
                             anchor, positive, negative
                         )
+
+                        if is_pca:
+                            # 对教师特征进行PCA降维和归一化处理
+                            teacher_anchor_pca = process_pca_features(teacher_anchor)
+                            teacher_positive_pca = process_pca_features(teacher_positive)
+                            teacher_negative_pca = process_pca_features(teacher_negative)
 
                     # 学生模型前向传播
                     student_anchor, student_positive, student_negative = student_model(
@@ -141,24 +166,50 @@ def distillation(
                         student_anchor, student_positive, student_negative
                     )
 
+                    if is_pca:
+                        # 对学生特征进行PCA降维和归一化处理
+                        student_anchor_pca = process_pca_features(student_anchor)
+                        student_positive_pca = process_pca_features(student_positive)
+                        student_negative_pca = process_pca_features(student_negative)
+
                     # 蒸馏损失（使用KL散度）
-                    distill_loss = (
-                        F.kl_div(
-                            F.log_softmax(student_anchor / temperature, dim=1),
-                            F.softmax(teacher_anchor / temperature, dim=1),
-                            reduction='batchmean'
-                        ) +
-                        F.kl_div(
-                            F.log_softmax(student_positive / temperature, dim=1),
-                            F.softmax(teacher_positive / temperature, dim=1),
-                            reduction='batchmean'
-                        ) +
-                        F.kl_div(
-                            F.log_softmax(student_negative / temperature, dim=1),
-                            F.softmax(teacher_negative / temperature, dim=1),
-                            reduction='batchmean'
-                        )
-                    ) * (temperature ** 2)
+                    if is_pca:
+                        # 蒸馏损失（使用KL散度）
+                        distill_loss = (
+                           F.kl_div(
+                               F.log_softmax(student_anchor_pca / temperature, dim=1),
+                               F.softmax(teacher_anchor_pca / temperature, dim=1),
+                               reduction='batchmean'
+                           ) +
+                           F.kl_div(
+                               F.log_softmax(student_positive_pca / temperature, dim=1),
+                               F.softmax(teacher_positive_pca / temperature, dim=1),
+                               reduction='batchmean'
+                           ) +
+                           F.kl_div(
+                               F.log_softmax(student_negative_pca / temperature, dim=1),
+                               F.softmax(teacher_negative_pca / temperature, dim=1),
+                               reduction='batchmean'
+                           )
+                        ) * (temperature ** 2)
+                    else:
+                        distill_loss = (
+                            F.kl_div(
+                                F.log_softmax(student_anchor / temperature, dim=1),
+                                F.softmax(teacher_anchor / temperature, dim=1),
+                                reduction='batchmean'
+                            ) +
+                            F.kl_div(
+                                F.log_softmax(student_positive / temperature, dim=1),
+                                F.softmax(teacher_positive / temperature, dim=1),
+                                reduction='batchmean'
+                            ) +
+                            F.kl_div(
+                                F.log_softmax(student_negative / temperature, dim=1),
+                                F.softmax(teacher_negative / temperature, dim=1),
+                                reduction='batchmean'
+                            )
+                        ) * (temperature ** 2)
 
                     # 总损失
                     loss = (1 - alpha) * triplet_loss + alpha * distill_loss
@@ -193,14 +244,14 @@ def distillation(
                 file_name = f"Extractor_{epoch + 1}.pth"
 
                 # 保存模型到指定路径
-                file_path = model_dir_path + file_name
+                file_path = os.path.join(model_dir_path, file_name)
                 torch.save(student_model.state_dict(), file_path)
                 tqdm.write(f"Distilled model saved to {file_path}")
 
                 # 绘制loss折线图
                 if test_list and (epoch + 1) in test_list[-3:]:
                     pic_save_path = model_dir_path + f"loss_{epoch+1}.png"
-                    plot_loss_curve(loss_per_epoch, num_epochs, "MobileNet", preprocess_type, pic_save_path)
+                    plot_loss_curve(loss_per_epoch, num_epochs, student_net_type, preprocess_type, pic_save_path)
 
             # 更新总进度条
             total_bar.update(1)
@@ -345,4 +396,3 @@ def finetune_with_awgn(
             total_bar.update(1)
 
     return model
-

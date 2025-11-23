@@ -1,21 +1,21 @@
 """训练模式相关函数"""
 import math
 import os
+import time
+
+import torch
+import torch.optim as optim
 from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader
 from tqdm import tqdm
-import torch
-import torch.optim as optim
-import matplotlib.pyplot as plt
-import time
-
-from experiment_logger import ExperimentLogger
-from plot.loss_plot import plot_loss_curve
-from training_utils.TripletDataset import TripletDataset, TripletLoss
-from net.TripletNet import TripletNet
 
 # 从配置模块导入设备
 from core.config import DEVICE
+from experiment_logger import ExperimentLogger
+from net.TripletNet import TripletNet
+from plot.loss_plot import plot_loss_curve
+from training_utils.TripletDataset import TripletDataset, TripletLoss
+from utils.FLOPs import calculate_flops_and_params
 
 
 def  train(data, labels, batch_size=16, num_epochs=200, learning_rate=1e-3,
@@ -34,9 +34,9 @@ def  train(data, labels, batch_size=16, num_epochs=200, learning_rate=1e-3,
 
     :param data: 输入数据, 通常为图像特征向量。
     :param labels: 输入数据的标签。
-    :param batch_size (int): 批处理大小, 每次迭代训练的网络输入数量。默认为32。
-    :param num_epochs (int): 训练的轮数(遍历整个数据集的次数)。默认为200。
-    :param learning_rate (float): 学习率, 控制优化器更新权重的步长。默认为1e-3。
+    :param batch_size: 批处理大小, 每次迭代训练的网络输入数量。默认为32。
+    :param num_epochs: 训练的轮数(遍历整个数据集的次数)。默认为200。
+    :param learning_rate: 学习率, 控制优化器更新权重的步长。默认为1e-3。
     :param net_type: 网络类型
     :param preprocess_type: 预处理类型
     :param test_list: 测试点列表
@@ -80,6 +80,9 @@ def  train(data, labels, batch_size=16, num_epochs=200, learning_rate=1e-3,
     # 训练模型
     model.to(DEVICE)
     model.train()
+
+    # 计算FLOPs和参数量
+    calculate_flops_and_params(model, train_dataset)
 
     print(
         "\n---------------------\n"

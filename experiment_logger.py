@@ -9,7 +9,7 @@ class ExperimentLogger:
         self.log_dir = log_dir
         os.makedirs(log_dir, exist_ok=True)
 
-    def create_experiment_record(self, experiment_config: Dict[str, Any]) -> str:
+    def create_experiment_record(self, experiment_config: Dict[str, Any]):
         """创建新的实验记录"""
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         exp_id = f"exp_{timestamp}"

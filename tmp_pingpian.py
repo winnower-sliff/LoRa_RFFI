@@ -1,12 +1,11 @@
-from random import randint, random
-from matplotlib import pyplot as plt
-from numpy.random import standard_normal, uniform
+import csv
+from random import randint
+
 import h5py
 import numpy as np
-import csv
+from matplotlib import pyplot as plt
 
 from training_utils.data_loader import LoadDataset
-
 
 dataset_name = "data"
 labelset_name = "label"

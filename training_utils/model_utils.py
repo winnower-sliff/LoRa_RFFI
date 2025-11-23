@@ -1,6 +1,6 @@
 # 模型加载函数
-import numpy as np
 import torch
+
 from net.TripletNet import TripletNet
 
 

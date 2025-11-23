@@ -14,7 +14,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 # 从配置模块导入
-from core.config import NetworkType, PRUNED_OUTPUT_DIR
+from core.config import NetworkType, PRUNED_DATA_DIR
 from net.TripletNet import TripletNet
 from net.net_prune import pruned_drsnet18
 from training_utils.data_preprocessor import load_model

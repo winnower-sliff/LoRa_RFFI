@@ -1,3 +1,4 @@
+# \modes\classfication_mode.py
 """分类模式相关函数"""
 import os
 import time
@@ -5,14 +6,17 @@ from collections import Counter
 
 import numpy as np
 import torch
+from sklearn.decomposition import PCA
 from sklearn.metrics import confusion_matrix, accuracy_score
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.svm import SVC
 
-from core.config import Mode
+from core.config import Mode, PCA_DIM_TEST  # Config枚举型
 from experiment_logger import ExperimentLogger
 from plot.confusion_plot import plot_confusion_matrices
 from training_utils.data_preprocessor import load_generate_triplet, load_model
+# 工具包
+from utils.FLOPs import calculate_flops_and_params
 from utils.better_print import TextAnimator
 from utils.yaml_handler import update_nested_yaml_entry
 
@@ -31,8 +35,9 @@ def test_classification(
     snr_range=None,
     model_dir=None,
     pps_for=None,
-    enable_plots=True,
+    is_pac=True,
     is_quantized_model=False,
+    enable_plots=False,
 ):
     """
     * 使用给定的特征提取模型(从指定路径加载)对注册数据集和分类数据集进行分类测试。
@@ -48,6 +53,7 @@ def test_classification(
     :param test_list: 测试点列表
     :param model_dir: 模型目录路径
     :param pps_for: 预处理类型名称
+    :param is_pac: 是否使用PAC降维
     :param enable_plots: 控制是否绘图（默认为True）
     """
 
@@ -59,9 +65,9 @@ def test_classification(
     logger = ExperimentLogger()
     exp_config = {
         "mode": mode,
-        "model": net_type,
+        "model": net_type.value,
         "data": {
-            "preprocess_type": preprocess_type,
+            "preprocess_type": preprocess_type.value,
             "test_points": test_list,
             "enrol_file": file_path_enrol,
             "clf_file": file_path_clf,
@@ -78,6 +84,7 @@ def test_classification(
     vote_size = 10
     weight_knn = 0.5
     weight_svm = 1 - weight_knn
+
 
     """
     提取设备特征
@@ -119,6 +126,9 @@ def test_classification(
             model = load_model(model_path, net_type, preprocess_type, is_quantized_model=is_quantized_model)
             print("Model loaded!!!")
 
+            # 计算FLOPs和参数量
+            calculate_flops_and_params(model, triplet_data_clf)
+
             # 提取特征
             # print("Feature extracting...")
             try:
@@ -129,12 +139,20 @@ def test_classification(
                     feature_enrol = model(*triplet_data_enrol)
                     enrol_feature_extraction_time = time.time() - start_time
 
+                pca = PCA(n_components=PCA_DIM_TEST)
+                pca.fit(feature_enrol[0])  # 只用 enrollment 特征
+                feature_enrol_pca = pca.transform(feature_enrol[0])  # 投影到低维
+
                 # 使用 K-NN 分类器进行训练
                 knnclf = KNeighborsClassifier(n_neighbors=100, metric="euclidean")
                 knnclf.fit(feature_enrol[0], label_enrol.ravel())
+                # knnclf.fit(feature_enrol_pca, label_enrol.ravel())
 
                 svmclf = SVC(kernel="rbf", C=1.0)  # 可以根据需要调整参数
-                svmclf.fit(feature_enrol[0], label_enrol.ravel())
+                if is_pac:
+                    svmclf.fit(feature_enrol_pca, label_enrol.ravel())
+                else:
+                    svmclf.fit(feature_enrol[0], label_enrol.ravel())
             finally:
                 text.stop()
 
@@ -155,27 +173,31 @@ def test_classification(
 
                 start_time = time.time()
 
+                # SVM 投影到 PCA, 按道理说KNN不需要
+                feature_clf_pca = pca.transform(feature_clf[0])
+
                 # K-NN和SVM的初步预测
                 pred_label_knn_wo = knnclf.predict(feature_clf[0])
-                pred_label_svm_wo = svmclf.predict(feature_clf[0])
+                # pred_label_knn_wo = knnclf.predict(feature_clf_pca)
+                if is_pac:
+                    pred_label_svm_wo = svmclf.predict(feature_clf_pca)
+                else:
+                    pred_label_svm_wo = svmclf.predict(feature_clf[0])
 
-                # K-NN投票机制
-                pred_label_knn_w_v = []
-                for i in range(len(pred_label_knn_wo)):
-                    window_start = max(0, i - vote_size // 2)
-                    window_end = min(len(pred_label_knn_wo), i + vote_size // 2 + 1)
-                    window_knn = pred_label_knn_wo[window_start:window_end]
-                    most_common_label_knn = Counter(window_knn).most_common(1)[0][0]
-                    pred_label_knn_w_v.append(most_common_label_knn)
+                def apply_voting(labels, vote_size):
+                    """应用滑动窗口投票机制"""
+                    voted_labels = []
+                    for i in range(len(labels)):
+                        window_start = max(0, i - vote_size // 2)
+                        window_end = min(len(labels), i + vote_size // 2 + 1)
+                        window = labels[window_start:window_end]
+                        most_common_label = Counter(window).most_common(1)[0][0]
+                        voted_labels.append(most_common_label)
+                    return voted_labels
 
-                # SVM投票机制
-                pred_label_svm_w_v = []
-                for i in range(len(pred_label_svm_wo)):
-                    window_start = max(0, i - vote_size // 2)
-                    window_end = min(len(pred_label_svm_wo), i + vote_size // 2 + 1)
-                    window_svm = pred_label_svm_wo[window_start:window_end]
-                    most_common_label_svm = Counter(window_svm).most_common(1)[0][0]
-                    pred_label_svm_w_v.append(most_common_label_svm)
+                # 应用投票机制
+                pred_label_knn_w_v = apply_voting(pred_label_knn_wo, vote_size)
+                pred_label_svm_w_v = apply_voting(pred_label_svm_wo, vote_size)
 
                 # 综合投票机制
                 combined_label = []

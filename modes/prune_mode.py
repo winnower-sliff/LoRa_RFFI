@@ -10,7 +10,7 @@ from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from core.config import Config, PRUNED_OUTPUT_DIR, H_VAL, DEVICE
+from core.config import Config, PRUNED_DATA_DIR, H_VAL, DEVICE
 from experiment_logger import ExperimentLogger
 from modes.classification_mode import test_classification
 from plot.loss_plot import plot_loss_curve
