@@ -38,10 +38,6 @@ class TripletNet(nn.Module):
             width_multiplier = 1 / 16
             self.embedding_net = mobilenet(version='lightV1', in_channels=in_channels, width_multiplier=width_multiplier)
 
-        elif net_type == NetworkType.LightNetV2:
-            width_multiplier = 1 / 16
-            self.embedding_net = mobilenet(version='lightV2', in_channels=in_channels, width_multiplier=width_multiplier)
-
         elif net_type == 3:
             if use_pytorch_prune:
                 # PyTorch原生剪枝模式：先创建原始网络，稍后应用剪枝

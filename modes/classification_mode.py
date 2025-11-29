@@ -17,6 +17,7 @@ from plot.confusion_plot import plot_confusion_matrices
 from training_utils.data_preprocessor import load_generate_triplet, load_model
 # 工具包
 from utils.FLOPs import calculate_flops_and_params
+from utils.PCA import plot_pca_scree
 from utils.better_print import TextAnimator
 from utils.yaml_handler import update_nested_yaml_entry
 
@@ -36,8 +37,7 @@ def test_classification(
     model_dir=None,
     pps_for=None,
     is_pac=True,
-    is_quantized_model=False,
-    enable_plots=False,
+    enable_plots=True,
 ):
     """
     * 使用给定的特征提取模型(从指定路径加载)对注册数据集和分类数据集进行分类测试。
@@ -54,7 +54,7 @@ def test_classification(
     :param model_dir: 模型目录路径
     :param pps_for: 预处理类型名称
     :param is_pac: 是否使用PAC降维
-    :param enable_plots: 控制是否绘图（默认为True）
+    :param enable_plots: 控制是否绘制混淆矩阵（默认为True）
     """
 
     # 子目录路径
@@ -115,15 +115,13 @@ def test_classification(
         print("=============================")
 
         # 保存路径
-
         confusion_save_dir = os.path.join(model_dir, f"cft/")
         model_path = os.path.join(model_dir, f"Extractor_{epoch}.pth")
-
 
         if not os.path.exists(model_path):
             print(f"{model_path} isn't exist")
         else:
-            model = load_model(model_path, net_type, preprocess_type, is_quantized_model=is_quantized_model)
+            model = load_model(model_path, net_type, preprocess_type)
             print("Model loaded!!!")
 
             # 计算FLOPs和参数量
@@ -138,6 +136,12 @@ def test_classification(
                     start_time = time.time()
                     feature_enrol = model(*triplet_data_enrol)
                     enrol_feature_extraction_time = time.time() - start_time
+
+                # 碎石图绘制逻辑
+                plot_scree = True
+                scree_max_components = 64
+                if plot_scree:
+                    plot_pca_scree(feats=feature_enrol[0], max_components=scree_max_components)
 
                 pca = PCA(n_components=PCA_DIM_TEST)
                 pca.fit(feature_enrol[0])  # 只用 enrollment 特征

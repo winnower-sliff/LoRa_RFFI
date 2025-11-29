@@ -152,9 +152,9 @@ def distillation(
 
                         if is_pca:
                             # 对教师特征进行PCA降维和归一化处理
-                            teacher_anchor_pca = process_pca_features(teacher_anchor)
-                            teacher_positive_pca = process_pca_features(teacher_positive)
-                            teacher_negative_pca = process_pca_features(teacher_negative)
+                            teacher_anchor = process_pca_features(teacher_anchor)
+                            teacher_positive = process_pca_features(teacher_positive)
+                            teacher_negative = process_pca_features(teacher_negative)
 
                     # 学生模型前向传播
                     student_anchor, student_positive, student_negative = student_model(
@@ -168,48 +168,28 @@ def distillation(
 
                     if is_pca:
                         # 对学生特征进行PCA降维和归一化处理
-                        student_anchor_pca = process_pca_features(student_anchor)
-                        student_positive_pca = process_pca_features(student_positive)
-                        student_negative_pca = process_pca_features(student_negative)
+                        student_anchor = process_pca_features(student_anchor)
+                        student_positive = process_pca_features(student_positive)
+                        student_negative = process_pca_features(student_negative)
 
                     # 蒸馏损失（使用KL散度）
-                    if is_pca:
-                        # 蒸馏损失（使用KL散度）
-                        distill_loss = (
-                           F.kl_div(
-                               F.log_softmax(student_anchor_pca / temperature, dim=1),
-                               F.softmax(teacher_anchor_pca / temperature, dim=1),
-                               reduction='batchmean'
-                           ) +
-                           F.kl_div(
-                               F.log_softmax(student_positive_pca / temperature, dim=1),
-                               F.softmax(teacher_positive_pca / temperature, dim=1),
-                               reduction='batchmean'
-                           ) +
-                           F.kl_div(
-                               F.log_softmax(student_negative_pca / temperature, dim=1),
-                               F.softmax(teacher_negative_pca / temperature, dim=1),
-                               reduction='batchmean'
-                           )
-                        ) * (temperature ** 2)
-                    else:
-                        distill_loss = (
-                            F.kl_div(
-                                F.log_softmax(student_anchor / temperature, dim=1),
-                                F.softmax(teacher_anchor / temperature, dim=1),
-                                reduction='batchmean'
-                            ) +
-                            F.kl_div(
-                                F.log_softmax(student_positive / temperature, dim=1),
-                                F.softmax(teacher_positive / temperature, dim=1),
-                                reduction='batchmean'
-                            ) +
-                            F.kl_div(
-                                F.log_softmax(student_negative / temperature, dim=1),
-                                F.softmax(teacher_negative / temperature, dim=1),
-                                reduction='batchmean'
-                            )
-                        ) * (temperature ** 2)
+                    distill_loss = (    # 教师为目标分布, 学生为源分布
+                       F.kl_div(
+                           F.log_softmax(student_anchor / temperature, dim=1),
+                           F.softmax(teacher_anchor / temperature, dim=1),
+                           reduction='batchmean'    # 把每个样本的 KL 散度求完后, 再对 batch 取平均
+                       ) +
+                       F.kl_div(
+                           F.log_softmax(student_positive / temperature, dim=1),
+                           F.softmax(teacher_positive / temperature, dim=1),
+                           reduction='batchmean'
+                       ) +
+                       F.kl_div(
+                           F.log_softmax(student_negative / temperature, dim=1),
+                           F.softmax(teacher_negative / temperature, dim=1),
+                           reduction='batchmean'
+                       )
+                    ) * (temperature ** 2)
 
                     # 总损失
                     loss = (1 - alpha) * triplet_loss + alpha * distill_loss

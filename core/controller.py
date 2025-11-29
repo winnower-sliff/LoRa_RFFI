@@ -18,7 +18,7 @@ def main(mode=Mode.TRAIN):
     """主函数"""
     config = Config(mode)
 
-    # 移除命令行参数解析，保留默认值
+    # 打印网络类型
     print(f"Running mode: {mode}")
     if config.mode == Mode.DISTILLATION:
         print(f"Teacher Net TYPE: {config.TEACHER_NET_TYPE}")
@@ -99,19 +99,20 @@ def run_rogue_device_detection_mode(config):
 
     # 执行恶意设备检测任务
     test_rogue_device_detection(
-        file_path_enrol="./dataset/Test/dataset_residential.h5",
-        dev_range_enrol=np.arange(30, 40, dtype=int),
+        config.mode,
+        file_path_enrol="dataset/Train/dataset_training_no_aug.h5",
+        dev_range_enrol=np.arange(0, 30, dtype=int),
         pkt_range_enrol=np.arange(0, 100, dtype=int),
-        file_path_legitimate="./dataset/Test/dataset_residential.h5",
-        dev_range_legitimate=np.arange(30, 40, dtype=int),
+        file_path_legitimate="dataset/Test/dataset_seen_devices.h5",
+        dev_range_legitimate=np.arange(0, 30, dtype=int),
         pkt_range_legitimate=np.arange(100, 200, dtype=int),
-        file_path_rogue="./dataset/Test/dataset_rogue.h5",
+        file_path_rogue="dataset/Test/dataset_rogue.h5",
         dev_range_rogue=np.arange(40, 45, dtype=int),
-        pkt_range_rogue=np.arange(0, 100, dtype=int),
+        pkt_range_rogue=np.arange(0, 200, dtype=int),
         net_type=config.NET_TYPE,
         preprocess_type=config.PROPRECESS_TYPE,
         test_list=config.TEST_LIST,
-        model_dir_path=config.MODEL_DIR,
+        model_dir=config.MODEL_DIR,
         wst_j=config.WST_J,
         wst_q=config.WST_Q,
     )
@@ -196,10 +197,12 @@ def run_distillation_mode(config):
                              model_path=config.TEACHER_MODEL_DIR + "origin/Extractor_200.pth",  # 默认使用第200轮的模型
                              output_path=PCA_FILE_INPUT,
                              teacher_net_type=config.TEACHER_NET_TYPE, preprocess_type=PreprocessType.STFT
-                        )
+                             )
+            print("PCA extract done.")
         # 执行PCA
         if config.IS_PCA_TRAIN and not os.path.exists(PCA_FILE_OUTPUT):
             perform_pca(input_file=PCA_FILE_INPUT, output_file=PCA_FILE_OUTPUT, n_components=PCA_DIM_TRAIN)
+            print("PCA done.")
 
         # 执行蒸馏训练
         student_model = distillation(
@@ -219,19 +222,6 @@ def run_distillation_mode(config):
 
     if config.DISTILLATE_MODE == 2:
 
-        # 准备训练数据
-        data, labels = prepare_train_data(
-            config.new_file_flag,
-            config.filename_train_prepared_data,
-            path_train_original_data="dataset/Train/dataset_training_no_aug.h5",
-            dev_range=np.arange(0, 40, dtype=int),
-            pkt_range=np.arange(0, 800, dtype=int),
-            snr_range=np.arange(10, 40),
-            generate_type=PreprocessType.IQ,
-            WST_J=config.WST_J,
-            WST_Q=config.WST_Q,
-        )
-
         # 微调阶段 - 使用不同SNR级别的噪声数据
         # snr_levels = [[30, 40], [20, 30], [10, 20], [0, 10]]  # 可以定义多个SNR范围
         snr_levels = [[20, 30], [10, 20], [0, 10]]  # 可以定义多个SNR范围
@@ -240,15 +230,12 @@ def run_distillation_mode(config):
             finetuned_model = finetune_with_awgn(
                 data=data,
                 labels=labels,
-                pretrained_model_path='./model/stft/LightRsMNV1/distillation/Extractor_best1.pth',
+                pretrained_model_path=config.STUDENT_MODEL_DIR + "distillation/Extractor_best1.pth",
                 snr_range=snr_range,
-                batch_size=64,
-                num_epochs=50,  # 微调轮数可以较少
-                learning_rate=1e-3,  # 较小学习率
                 net_type=config.STUDENT_NET_TYPE,
                 preprocess_type=config.PROPRECESS_TYPE,
                 test_list=[10, 20, 30, 50],
-                model_dir_path='./model/stft/LightRsMNV1/distillation'
+                model_dir_path=config.STUDENT_MODEL_DIR + "distillation/"
             )
 
     if config.DISTILLATE_MODE == 0 or config.DISTILLATE_MODE == 3:
@@ -262,10 +249,10 @@ def run_distillation_mode(config):
             config.mode,
             file_path_enrol="dataset/Train/dataset_training_no_aug.h5",
             file_path_clf="dataset/Test/dataset_seen_devices.h5 ",
-            dev_range_enrol=np.arange(0, 15, dtype=int),
-            pkt_range_enrol=np.arange(200, 400, dtype=int),
-            dev_range_clf=np.arange(0, 15, dtype=int),
-            pkt_range_clf=np.arange(0, 200, dtype=int),
+            dev_range_enrol=np.arange(0, 30, dtype=int),
+            pkt_range_enrol=np.arange(400, 450, dtype=int),
+            dev_range_clf=np.arange(0, 30, dtype=int),
+            pkt_range_clf=np.arange(0, 400, dtype=int),
             net_type=config.STUDENT_NET_TYPE,
             preprocess_type=config.PROPRECESS_TYPE,
             test_list=config.TEST_LIST,
@@ -273,4 +260,27 @@ def run_distillation_mode(config):
             model_dir=config.STUDENT_MODEL_DIR,
             pps_for=config.PPS_FOR,
             is_pac=config.IS_PCA_TEST,
+        )
+    if config.DISTILLATE_MODE == 0 or config.DISTILLATE_MODE == 4:
+
+        print_colored_text("蒸馏后的甄别恶意模式", "32")
+
+        # 执行恶意设备检测任务
+        test_rogue_device_detection(
+            config.mode,
+            file_path_enrol="dataset/Train/dataset_training_no_aug.h5",
+            dev_range_enrol=np.arange(0, 30, dtype=int),
+            pkt_range_enrol=np.arange(0, 200, dtype=int),
+            file_path_legitimate="dataset/Test/dataset_seen_devices.h5",
+            dev_range_legitimate=np.arange(0, 30, dtype=int),
+            pkt_range_legitimate=np.arange(100, 200, dtype=int),
+            file_path_rogue="dataset/Test/dataset_rogue.h5",
+            dev_range_rogue=np.arange(40, 45, dtype=int),
+            pkt_range_rogue=np.arange(0, 200, dtype=int),
+            net_type=config.NET_TYPE,
+            preprocess_type=config.PROPRECESS_TYPE,
+            test_list=config.TEST_LIST,
+            model_dir=config.MODEL_DIR,
+            wst_j=config.WST_J,
+            wst_q=config.WST_Q,
         )

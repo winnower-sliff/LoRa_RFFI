@@ -1,12 +1,15 @@
 # utils/PCA.py
 import numpy as np
 import torch
+from matplotlib import pyplot as plt
 from sklearn.decomposition import PCA
 from torch.utils.data import DataLoader
 
-from core.config import Config, DEVICE, Mode
+from core.config import Config, DEVICE, Mode, PreprocessType
 from net.TripletNet import TripletNet
+from core.config import NetworkType
 from training_utils.TripletDataset import TripletDataset
+from training_utils.data_preprocessor import prepare_train_data
 
 
 def extract_features(
@@ -91,9 +94,100 @@ def perform_pca(input_file="teacher_feats.npz", output_file="pca_16.npz", n_comp
     
     return components, mean
 
+
+def plot_pca_scree(input_file="teacher_feats.npz", max_components=None, save_path=None, feats=None):
+    """
+    绘制PCA碎石图
+
+    :param input_file: 输入的特征文件路径
+    :param max_components: 最大显示的主成分数量，默认为特征维度数
+    :param save_path: 图片保存路径，如果提供则保存图片
+    :param feats: 特征数据（可选，如果不提供则从input_file加载）
+    :return: None
+    """
+
+    # 加载数据
+    if feats is None:
+        data = np.load(input_file)
+        feats = data['feats']
+
+    # 如果未指定最大组件数，则使用特征数
+    if max_components is None:
+        max_components = min(feats.shape[0], feats.shape[1])
+
+    # 执行PCA
+    pca = PCA(n_components=max_components)
+    pca.fit(feats)
+
+    # 获取方差解释比例
+    explained_variance_ratio = pca.explained_variance_ratio_
+    cumulative_variance_ratio = np.cumsum(explained_variance_ratio)
+
+    # 绘制碎石图
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 6))
+
+    # 子图1: 各主成分的方差解释比例
+    ax1.bar(range(1, len(explained_variance_ratio) + 1), explained_variance_ratio)
+    ax1.set_xlabel('Principal Component')
+    ax1.set_ylabel('Explained Variance Ratio')
+    ax1.set_title('Scree Plot - Explained Variance by Component')
+    ax1.grid(True, alpha=0.3)
+
+    # 子图2: 累积方差解释比例
+    ax2.plot(range(1, len(cumulative_variance_ratio) + 1), cumulative_variance_ratio, marker='o')
+    ax2.set_xlabel('Number of Components')
+    ax2.set_ylabel('Cumulative Explained Variance Ratio')
+    ax2.set_title('Cumulative Explained Variance')
+    ax2.grid(True, alpha=0.3)
+    ax2.axhline(y=0.95, color='r', linestyle='--', label='95% Explained Variance')
+    ax2.legend()
+
+    plt.tight_layout()
+    
+    # 保存图片
+    if save_path:
+        plt.savefig(save_path, dpi=300, bbox_inches='tight')
+        print(f"PCA scree plot saved to {save_path}")
+    
+    plt.show()
+
+    # 打印前20个主成分的方差解释比例
+    print("Top 20 Principal Components:")
+    for i in range(min(20, len(explained_variance_ratio))):
+        print(f"PC{i+1}: {explained_variance_ratio[i]:.4f} "
+              f"({cumulative_variance_ratio[i]:.4f} cumulative)")
+
 if __name__ == '__main__':
     config = Config(Mode.TEST)
+
+    # 准备训练数据
+    data, labels = prepare_train_data(
+        config.new_file_flag,
+        config.filename_train_prepared_data,
+        path_train_original_data="../dataset/Train/dataset_training_no_aug.h5",
+        dev_range=np.arange(0, 40, dtype=int),
+        pkt_range=np.arange(0, 800, dtype=int),
+        snr_range=np.arange(20, 80),
+        generate_type=config.PROPRECESS_TYPE,
+        WST_J=config.WST_J,
+        WST_Q=config.WST_Q,
+    )
+
     # 提取特征
-    # extract_features()
+    extract_features(
+        data, labels,
+        batch_size=128,
+        model_path="../model/stft/ResNet/origin/Extractor_200.pth",
+        output_path="../experiments/pca_results/teacher_feats_origintrain.npz",
+        teacher_net_type=NetworkType.RESNET,
+        preprocess_type=PreprocessType.STFT
+    )
+
     # 执行PCA
-    perform_pca()
+    # perform_pca()
+
+    # 绘制碎石图
+    plot_pca_scree(input_file="../experiments/pca_results/teacher_feats_origintrain.npz",
+                   max_components=16,
+                   save_path="../experiments/pca_results/pca_scree_origintrain.png"
+    )
