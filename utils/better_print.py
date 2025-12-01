@@ -3,14 +3,24 @@ import time
 
 
 class TextAnimator:
-    """在终端中显示动态文本动画的线程化工具"""
+    """在终端中显示动态文本动画的线程化工具
 
-    def __init__(self):
-        """初始化文本动画生成器"""
-        self.__text_running = ""  # 初始化属性避免 AttributeError
-        self.__text_finish = ""
-        self.__anim_thread = None
-        self.__stop_event = None
+    Attributes:
+        __text_running (str): 动画运行期间显示的基础文本
+        __text_finish (str): 动画结束时显示的最终文本
+    """
+
+    def __init__(self, text_run: str, text_finish: str = None):
+        """初始化文本动画生成器
+
+        Args:
+            text_run: 动画运行期间持续显示的基础文本
+            text_finish: 动画结束时要显示的文本（默认与text_run相同）
+        """
+        self.__stop_event = threading.Event()
+        self.__text_running = text_run
+        self.__text_finish = text_finish if text_finish else text_run
+        self.__anim_thread = threading.Thread(target=self._animate)
 
     def _animate(self):
         """执行动画的核心循环逻辑
@@ -31,31 +41,20 @@ class TextAnimator:
         cost_time = end_time - start_time
 
         print(
-            f"\r{self.__text_finish}{\
-                " "*max(2,30-len(self.__text_finish)) if len(self.__text_finish)<30 else '\n'+' '*30\
-                    }Cost Time: {cost_time:5.2f}s\033[K"
+            f"\r{self.__text_finish}!!!   Cost Time: {cost_time:.2f}s\033[K"
         )  # \033[K 清除行尾
 
-    def start(self, text_run: str):
-        """启动动画线程（支持多次调用）"""
-        # 如果已有线程在运行，先停止它
-        if self.__anim_thread and self.__anim_thread.is_alive():
-            self.stop()
-
-        # 初始化新的停止事件和线程
-        self.__stop_event = threading.Event()
-        self.__text_running = text_run
-        self.__text_finish = text_run  # 默认与 text_run 相同
-        self.__anim_thread = threading.Thread(target=self._animate)
+    def start(self):
+        """启动动画线程"""
         self.__anim_thread.start()
 
-    def stop(self, text_finish: str = None):
-        """停止动画并等待线程结束"""
-        if self.__anim_thread and self.__anim_thread.is_alive():
-            self.__text_finish = text_finish if text_finish else self.__text_running
-            self.__stop_event.set()
-            self.__anim_thread.join()
-            self.__anim_thread = None  # 清理线程对象
+    def stop(self):
+        """停止动画并等待线程结束
+
+        发送停止信号后，会等待动画线程完成最后的输出清理操作
+        """
+        self.__stop_event.set()
+        self.__anim_thread.join()
 
 
 def print_colored_text(text, color_code):

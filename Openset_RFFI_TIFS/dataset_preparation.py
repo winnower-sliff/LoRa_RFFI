@@ -24,7 +24,7 @@ def awgn(data, snr_range):
 
 
 
-class LoadDataset():
+class LoadDataset:
     def __init__(self,):
         self.dataset_name = 'data'
         self.labelset_name = 'label'
@@ -86,7 +86,7 @@ class LoadDataset():
 
 
 
-class ChannelIndSpectrogram():
+class ChannelIndSpectrogram:
     def __init__(self,):
         pass
     
