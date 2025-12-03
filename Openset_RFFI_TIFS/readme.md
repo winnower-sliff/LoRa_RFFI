@@ -1,15 +1,27 @@
-# README
-This project builds a LoRa radio frequency fingerprint identification (RFFI) system based on deep learning techiniques. A dataset containing signals collected from 60 LoRa devices is also provided.  The detailed collection settings for the different sub-datasets can be found in Section [Dataset Introduction](#jump1). The section of [Code Example](#jump2) introduces the usage of some important functions, for more detailed usage please read the code comments carefully.
+# Openset_RFFI_TIFS
 
-## Citation
+这个文件夹包含了来自论文"Towards Scalable and Channel-Robust Radio Frequency Fingerprint Identification for LoRa"的相关代码和资料。
 
-If the part of the dataset/codes contributes to your project, please cite:
+该项目基于深度学习技术构建了一个LoRa射频指纹识别(RFFI)系统，并提供了一个包含60个LoRa设备信号的数据集。
+
+## 内容说明
+
+- [augmentation.m](augmentation.m)：MATLAB格式的信号增强脚本
+- [dataset_preparation.py](dataset_preparation.py)：数据集准备和预处理功能
+- [deep_learning_models.py](deep_learning_models.py)：深度学习模型实现
+- [main.py](main.py)：主要执行入口文件
+- [readme.md](readme.md)：原项目的详细说明文档，包括数据集介绍和代码使用示例
+- [readme_images/](readme_images/)：说明文档中使用的图片文件夹
+
+## 引用信息
+
+如果此数据集/代码对您的项目有帮助，请引用以下文献：
 
 ```
-[1] G. Shen, J. Zhang, A. Marshall, and J. Cavallaro.   “Towards Scalable and Channel-Robust Radio Frequency 
-Fingerprint Identification for LoRa,” IEEE Trans. Inf. Forensics Security, 2022.
+[1] G. Shen, J. Zhang, A. Marshall, and J. Cavallaro. "Towards Scalable and Channel-Robust Radio Frequency Fingerprint Identification for LoRa," IEEE Trans. Inf. Forensics Security, 2022.
 ```
 
+BibTeX格式：
 ```
 @article{shen2021towards,
   title={Towards Scalable and Channel-Robust Radio Frequency Fingerprint Identification for LoRa},
