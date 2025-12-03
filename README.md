@@ -20,7 +20,7 @@ LoRa_RFFI/
 ├── pruning_utils/         # 模型剪枝工具
 ├── training_utils/        # 训练相关工具
 ├── utils/                 # 通用工具函数
-├── Openset_RFFI_TIFS/     # 原始开源项目代码和数据集
+├── original_research/     # 原始研究项目代码和数据集（仅供引用参考）
 ```
 
 ## 使用方法

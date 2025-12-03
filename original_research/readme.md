@@ -1,27 +1,29 @@
-# Openset_RFFI_TIFS
+# Original Research Implementation (For Reference Only)
 
-这个文件夹包含了来自论文"Towards Scalable and Channel-Robust Radio Frequency Fingerprint Identification for LoRa"的相关代码和资料。
+This folder contains the original code and materials from the paper "Towards Scalable and Channel-Robust Radio Frequency Fingerprint Identification for LoRa".
 
-该项目基于深度学习技术构建了一个LoRa射频指纹识别(RFFI)系统，并提供了一个包含60个LoRa设备信号的数据集。
+This project was built using deep learning techniques to create a LoRa radio frequency fingerprint identification (RFFI) system, and provides a dataset containing signals collected from 60 LoRa devices.
 
-## 内容说明
+**Note: This code is provided for reference purposes only and is not actively maintained or used in the current project implementation.**
 
-- [augmentation.m](augmentation.m)：MATLAB格式的信号增强脚本
-- [dataset_preparation.py](dataset_preparation.py)：数据集准备和预处理功能
-- [deep_learning_models.py](deep_learning_models.py)：深度学习模型实现
-- [main.py](main.py)：主要执行入口文件
-- [readme.md](readme.md)：原项目的详细说明文档，包括数据集介绍和代码使用示例
-- [readme_images/](readme_images/)：说明文档中使用的图片文件夹
+## Content Description
 
-## 引用信息
+- [augmentation.m](augmentation.m): Signal augmentation script in MATLAB format
+- [dataset_preparation.py](dataset_preparation.py): Dataset preparation and preprocessing functions
+- [deep_learning_models.py](deep_learning_models.py): Deep learning model implementations
+- [main.py](main.py): Main execution entry file
+- [readme.md](readme.md): Detailed documentation of the original project, including dataset introduction and code usage examples
+- [readme_images/](readme_images/): Image folder used in the documentation
 
-如果此数据集/代码对您的项目有帮助，请引用以下文献：
+## Original Paper Information
+
+If this dataset/code contributes to your project, please cite:
 
 ```
 [1] G. Shen, J. Zhang, A. Marshall, and J. Cavallaro. "Towards Scalable and Channel-Robust Radio Frequency Fingerprint Identification for LoRa," IEEE Trans. Inf. Forensics Security, 2022.
 ```
 
-BibTeX格式：
+BibTeX format:
 ```
 @article{shen2021towards,
   title={Towards Scalable and Channel-Robust Radio Frequency Fingerprint Identification for LoRa},
@@ -104,7 +106,7 @@ Please find the 'requirement.txt' file to install the required packages.
 
 #### b) Download Dataset
 
-Please downlaod the dataset and put it in the project folder. The download link is https://ieee-dataport.org/open-access/lorarffidataset.
+Please download the dataset and put it in the project folder. The download link is https://ieee-dataport.org/open-access/lorarffidataset.
 
 #### c) Operating System
 
