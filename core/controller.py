@@ -3,7 +3,7 @@ import os
 import numpy as np
 
 # 从配置模块导入配置、设备和模式枚举
-from core.config import Config, Mode, PreprocessType, PCA_FILE_INPUT, PCA_FILE_OUTPUT, PCA_DIM_TRAIN
+from core import config
 from modes.classification_mode import test_classification
 from modes.prune_mode import pruning
 from modes.rogue_device_detection_mode import test_rogue_device_detection
@@ -14,30 +14,30 @@ from utils.PCA import perform_pca, extract_features
 from utils.better_print import print_colored_text
 
 
-def main(mode=Mode.TRAIN):
+def main(mode=config.Mode.TRAIN):
     """主函数"""
-    config = Config(mode)
+    config_obj = config.Config(mode)
 
     # 打印网络类型
     print(f"Running mode: {mode}")
-    if config.mode == Mode.DISTILLATION:
-        print(f"Teacher Net TYPE: {config.TEACHER_NET_TYPE}")
-        print(f"Student Net TYPE: {config.STUDENT_NET_TYPE}")
+    if config_obj.mode == config.Mode.DISTILLATION:
+        print(f"Teacher Net TYPE: {config_obj.TEACHER_NET_TYPE}")
+        print(f"Student Net TYPE: {config_obj.STUDENT_NET_TYPE}")
     else:
-        print(f"Net TYPE: {config.NET_TYPE}")
+        print(f"Net TYPE: {config_obj.NET_TYPE}")
 
     # 使用字典映射替代 if-elif-else 结构
     mode_functions = {
-        Mode.TRAIN: run_train_mode,
-        Mode.CLASSIFICATION: run_classification_mode,
-        Mode.ROGUE_DEVICE_DETECTION: run_rogue_device_detection_mode,
-        Mode.PRUNE: run_pruning_mode,
-        Mode.DISTILLATION: run_distillation_mode,
+        config.Mode.TRAIN: run_train_mode,
+        config.Mode.CLASSIFICATION: run_classification_mode,
+        config.Mode.ROGUE_DEVICE_DETECTION: run_rogue_device_detection_mode,
+        config.Mode.PRUNE: run_pruning_mode,
+        config.Mode.DISTILLATION: run_distillation_mode,
     }
 
     # 执行对应模式的函数
     if mode in mode_functions:
-        mode_functions[mode](config)
+        mode_functions[mode](config_obj)
     else:
         raise ValueError(f"Unknown mode: {mode}")
 
@@ -67,7 +67,7 @@ def run_train_mode(config):
         net_type=config.NET_TYPE,
         preprocess_type=config.PROPRECESS_TYPE,
         test_list=config.TEST_LIST,
-        model_dir_path=config.ORIGIN_MODEL_DIR,
+        model_dir_path=config.ORIGIN_MODEL_DIR_PATH,
     )
 
 
@@ -121,7 +121,7 @@ def run_rogue_device_detection_mode(config):
 def run_pruning_mode(config):
     """剪枝模式"""
 
-    if config.prune_mode == 0 or config.prune_mode == 1:
+    if config.PRUNE_MODE == 0 or config.PRUNE_MODE == 1:
 
         print_colored_text("剪枝模式", "32")
 
@@ -148,7 +148,7 @@ def run_pruning_mode(config):
             test_list=config.TEST_LIST,
         )
 
-    if config.prune_mode == 0 or config.prune_mode == 2:
+    if config.PRUNE_MODE == 0 or config.PRUNE_MODE == 2:
 
         # 测试最终模型
         print("测试模型...")
@@ -192,16 +192,16 @@ def run_distillation_mode(config):
         )
 
         # 提取教师模型特征
-        if config.IS_PCA_TRAIN and not os.path.exists(PCA_FILE_INPUT):
+        if config.IS_PCA_TRAIN and not os.path.exists(config.PCA_FILE_INPUT):
             extract_features(data, labels, batch_size=128,
                              model_path=config.TEACHER_MODEL_DIR + "origin/Extractor_200.pth",  # 默认使用第200轮的模型
-                             output_path=PCA_FILE_INPUT,
-                             teacher_net_type=config.TEACHER_NET_TYPE, preprocess_type=PreprocessType.STFT
+                             output_path=config.PCA_FILE_INPUT,
+                             teacher_net_type=config.TEACHER_NET_TYPE, preprocess_type=config.PreprocessType.STFT
                              )
             print("PCA extract done.")
         # 执行PCA
-        if config.IS_PCA_TRAIN and not os.path.exists(PCA_FILE_OUTPUT):
-            perform_pca(input_file=PCA_FILE_INPUT, output_file=PCA_FILE_OUTPUT, n_components=PCA_DIM_TRAIN)
+        if config.IS_PCA_TRAIN and not os.path.exists(config.PCA_FILE_OUTPUT):
+            perform_pca(input_file=config.PCA_FILE_INPUT, output_file=config.PCA_FILE_OUTPUT, n_components=config.PCA_DIM_TRAIN)
             print("PCA done.")
 
         # 执行蒸馏训练

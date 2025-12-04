@@ -98,13 +98,14 @@ class Config:
             self.filename_train_prepared_data = f"train_data_{self.PPS_FOR}.h5"
         else:
             self.PPS_FOR = "wst"
-            self.ORIGIN_MODEL_DIR_PATH = (
-                f"./model/{self.PPS_FOR}_j{self.WST_J}q{self.WST_Q}/{self.NET_TYPE}/"
+            self.ORIGIN_MODEL_DIR_PATH = (  # 更正变量名，使其更加明确
+                f"./model/{self.PPS_FOR}_j{self.WST_J}q{self.WST_Q}/{self.NET_TYPE.value}/"  # 添加.value访问枚举值
             )
             self.filename_train_prepared_data = (
                 f"train_data_{self.PPS_FOR}_j{self.WST_J}q{self.WST_Q}.h5"
             )
 
+        # 创建模型目录
         if not os.path.exists(self.MODEL_DIR):
             os.makedirs(self.MODEL_DIR)
         if not os.path.exists(self.TEACHER_MODEL_DIR):
