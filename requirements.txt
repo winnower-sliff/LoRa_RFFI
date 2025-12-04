@@ -24,3 +24,4 @@ tqdm>=4.62.0
 
 # 其他工具
 PyWavelets>=1.2.0
+kymatio>=0.2.0
