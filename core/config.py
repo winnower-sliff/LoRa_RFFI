@@ -30,12 +30,15 @@ if not os.path.exists(PCA_DATA_DIR):
 
 # 定义运行模式的枚举
 class Mode:
-    TRAIN = "train"
-    CLASSIFICATION = "classification"
-    ROGUE_DEVICE_DETECTION = "rogue_device_detection"
-    PRUNE = "prune"
-    DISTILLATION = "distillation"
-    TEST = "test"
+    """运行模式枚举类
+    
+    用于定义系统支持的不同运行模式，每个模式对应不同的功能流程
+    """
+    TRAIN = "train"                    # 训练模式 - 用于训练基础模型
+    CLASSIFICATION = "classification"  # 分类模式 - 用于设备指纹分类任务
+    ROGUE_DEVICE_DETECTION = "rogue_device_detection"  # 恶意设备检测模式 - 用于检测非法设备
+    PRUNE = "prune"                    # 剪枝模式 - 用于模型压缩和优化
+    DISTILLATION = "distillation"      # 蒸馏模式 - 用于知识蒸馏训练轻量级模型
 
 
 # 定义网络类型枚举
@@ -87,9 +90,7 @@ class Config:
         self.WST_J = 6
         self.WST_Q = 6
 
-
         # 后续设置
-
         if self.PROPRECESS_TYPE == PreprocessType.STFT:
             self.PPS_FOR = "stft"
             self.MODEL_DIR= f"./model/{self.PPS_FOR}/{self.NET_TYPE.value}/"
@@ -98,12 +99,15 @@ class Config:
             self.filename_train_prepared_data = f"train_data_{self.PPS_FOR}.h5"
         else:
             self.PPS_FOR = "wst"
-            self.ORIGIN_MODEL_DIR_PATH = (  # 更正变量名，使其更加明确
-                f"./model/{self.PPS_FOR}_j{self.WST_J}q{self.WST_Q}/{self.NET_TYPE.value}/"  # 添加.value访问枚举值
-            )
+            self.MODEL_DIR= f"./model/{self.PPS_FOR}_j{self.WST_J}q{self.WST_Q}/{self.NET_TYPE.value}/"
+            self.TEACHER_MODEL_DIR = f"./model/{self.PPS_FOR}_j{self.WST_J}q{self.WST_Q}/{self.TEACHER_NET_TYPE.value}/"
+            self.STUDENT_MODEL_DIR = f"./model/{self.PPS_FOR}_j{self.WST_J}q{self.WST_Q}/{self.STUDENT_NET_TYPE.value}/"
             self.filename_train_prepared_data = (
                 f"train_data_{self.PPS_FOR}_j{self.WST_J}q{self.WST_Q}.h5"
             )
+
+        # 原始模型目录路径（用于训练模式）
+        self.ORIGIN_MODEL_DIR_PATH = self.MODEL_DIR
 
         # 创建模型目录
         if not os.path.exists(self.MODEL_DIR):
