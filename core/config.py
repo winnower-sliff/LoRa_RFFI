@@ -30,12 +30,11 @@ if not os.path.exists(PCA_DATA_DIR):
 
 # 定义运行模式的枚举
 class Mode:
-    TRAIN = "train"
-    CLASSIFICATION = "classification"
-    ROGUE_DEVICE_DETECTION = "rogue_device_detection"
-    PRUNE = "prune"
-    DISTILLATION = "distillation"
-    TEST = "test"
+    TRAIN = "train"                    # 训练模式 - 用于训练基础模型
+    CLASSIFICATION = "classification"  # 分类模式 - 用于设备指纹分类任务
+    ROGUE_DEVICE_DETECTION = "rogue_device_detection"  # 恶意设备检测模式 - 用于检测非法设备
+    PRUNE = "prune"                    # 剪枝模式 - 用于模型压缩和优化
+    DISTILLATION = "distillation"      # 蒸馏模式 - 用于知识蒸馏训练轻量级模型
 
 
 # 定义网络类型枚举
@@ -57,7 +56,6 @@ class PreprocessType(Enum):
     def __init__(self, name, in_channels):
         self._value_ = name
         self.in_channels = in_channels
-
 
 
 # 配置类，用于存储全局配置参数

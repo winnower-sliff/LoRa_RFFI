@@ -61,13 +61,14 @@ def run_train_mode(config):
 
     # 训练特征提取模型
     train(
+        config.mode,
         data,
         labels,
         num_epochs=max(config.TEST_LIST),
         net_type=config.NET_TYPE,
         preprocess_type=config.PROPRECESS_TYPE,
         test_list=config.TEST_LIST,
-        model_dir_path=config.ORIGIN_MODEL_DIR,
+        model_dir=config.ORIGIN_MODEL_DIR,
     )
 
 

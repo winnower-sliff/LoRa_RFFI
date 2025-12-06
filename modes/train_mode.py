@@ -10,16 +10,15 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 # 从配置模块导入设备
-from core.config import DEVICE
-from experiment_logger import ExperimentLogger
+from core.config import DEVICE, Mode
 from net.TripletNet import TripletNet
 from plot.loss_plot import plot_loss_curve
 from training_utils.TripletDataset import TripletDataset, TripletLoss
 from utils.FLOPs import calculate_flops_and_params
 
 
-def  train(data, labels, batch_size=16, num_epochs=200, learning_rate=1e-3,
-          net_type=None, preprocess_type=None, test_list=None, model_dir_path=None):
+def train(mode, data, labels, batch_size=16, num_epochs=200, learning_rate=1e-3,
+          net_type=None, preprocess_type=None, test_list=None, model_dir=None):
     """
     准备数据并训练三元组网络模型。
 
@@ -40,27 +39,13 @@ def  train(data, labels, batch_size=16, num_epochs=200, learning_rate=1e-3,
     :param net_type: 网络类型
     :param preprocess_type: 预处理类型
     :param test_list: 测试点列表
-    :param model_dir_path: 模型保存路径
+    :param model_dir: 模型保存路径
     """
 
-    # 初始化实验记录
-    logger = ExperimentLogger()
-    exp_config = {
-        "mode": "train",
-        "model": {
-            "type": net_type,
-            "parameters": {
-                "batch_size": batch_size,
-                "epochs": num_epochs,
-                "learning_rate": learning_rate
-            }
-        },
-        "data": {
-            "preprocess_type": preprocess_type,
-            "test_points": test_list
-        }
-    }
-    exp_filepath, exp_id = logger.create_experiment_record(exp_config)
+    # 子目录路径
+    if mode == Mode.CLASSIFICATION:
+        mode = 'origin'
+    model_dir = os.path.join(model_dir, mode)
 
     # 数据集划分
     data_train, data_valid, labels_train, labels_valid = train_test_split(
@@ -140,31 +125,21 @@ def  train(data, labels, batch_size=16, num_epochs=200, learning_rate=1e-3,
             # 保存训练好的模型
             if test_list and (epoch + 1) in test_list:
                 # 创建文件夹&文件
-                if not os.path.exists(model_dir_path):
-                    os.makedirs(model_dir_path)
+                if not os.path.exists(model_dir):
+                    os.makedirs(model_dir)
                 file_name = f"Extractor_{epoch + 1}.pth"
 
                 # 保存模型到指定路径
-                file_path = model_dir_path + file_name
+                file_path = os.path.join(model_dir, file_name)
                 torch.save(model.state_dict(), file_path)
                 tqdm.write(f"Model saved to {file_path}")
 
                 # 绘制loss折线图
                 if test_list and (epoch + 1) in test_list[-3:]:
-                    pic_save_path = model_dir_path + f"loss_{epoch+1}.png"
+                    pic_save_path = model_dir + f"loss_{epoch+1}.png"
                     plot_loss_curve(loss_per_epoch, num_epochs, net_type, preprocess_type, pic_save_path)
 
             # 更新总进度条
             total_bar.update(1)
-
-    # 记录实验结果
-    final_results = {
-        "training": {
-            "final_loss": loss_ep,
-            "total_epochs": num_epochs,
-            "model_saved_path": model_dir_path
-        }
-    }
-    logger.update_experiment_result(exp_id, final_results)
 
     return model

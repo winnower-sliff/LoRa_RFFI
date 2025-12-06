@@ -12,18 +12,16 @@ from sklearn.neighbors import KNeighborsClassifier
 from sklearn.svm import SVC
 
 from core.config import Mode, PCA_DIM_TEST  # Config枚举型
-from experiment_logger import ExperimentLogger
 from plot.confusion_plot import plot_confusion_matrices
 from training_utils.data_preprocessor import load_generate_triplet, load_model
 # 工具包
 from utils.FLOPs import calculate_flops_and_params
 from utils.PCA import plot_pca_scree
 from utils.better_print import TextAnimator
-from utils.yaml_handler import update_nested_yaml_entry
 
 
 def test_classification(
-    mode: str=None,
+    mode=None,
     file_path_enrol: str=None,
     file_path_clf: str=None,
     dev_range_enrol: np.array=None,
@@ -61,24 +59,6 @@ def test_classification(
     if mode == Mode.CLASSIFICATION:
         mode = 'origin'
 
-    # 初始化实验记录
-    logger = ExperimentLogger()
-    exp_config = {
-        "mode": mode,
-        "model": net_type.value,
-        "data": {
-            "preprocess_type": preprocess_type.value,
-            "test_points": test_list,
-            "enrol_file": file_path_enrol,
-            "clf_file": file_path_clf,
-            "dev_range_enrol": [int(dev_range_enrol[0]), int(dev_range_enrol[-1])],
-            "dev_range_clf": [int(dev_range_clf[0]), int(dev_range_clf[-1])],
-            "pkt_range_enrol": [int(pkt_range_enrol[0]), int(pkt_range_enrol[-1])],
-            "pkt_range_clf": [int(pkt_range_clf[0]), int(pkt_range_clf[-1])],
-        }
-    }
-    exp_filepath, exp_id = logger.create_experiment_record(exp_config)
-
     # 加载数据
 
     vote_size = 10
@@ -104,18 +84,14 @@ def test_classification(
     )
     print("\nData loaded!!!")
 
-    # 定义YAML文件路径（在循环内部定义，确保正确的路径）
-    yaml_file_path = os.path.join(model_dir, "performance_records.yaml")
     model_dir = os.path.join(model_dir, mode)
-
-    classification_results = {}
 
     for epoch in test_list or []:
         print()
         print("=============================")
 
         # 保存路径
-        confusion_save_dir = os.path.join(model_dir, f"cft/")
+        confusion_save_dir = os.path.join(model_dir, "cft")
         model_path = os.path.join(model_dir, f"Extractor_{epoch}.pth")
 
         if not os.path.exists(model_path):
@@ -260,34 +236,6 @@ def test_classification(
             w_cms = [conf_mat_knn_w, conf_mat_svm_w, conf_mat_combined]
             wwo_cms = [wo_cms, w_cms]
 
-            # 记录性能数据
-            classification_info = {
-                'accuracies': {
-                    'knn_wo_voting': float(wo_acc_knn),
-                    'svm_wo_voting': float(wo_acc_svm),
-                    'knn_w_voting': float(w_acc_knn),
-                    'svm_w_voting': float(w_acc_svm),
-                    'combined_w_weighted_voting': float(acc_combined)
-                },
-                'inference_times': {
-                    'enrol_feature_extraction': float(enrol_feature_extraction_time),
-                    'classification_feature_extraction': float(clf_feature_extraction_time),
-                    'knn_prediction': float(prediction_time),
-                },
-                'vote_size': vote_size,
-                'weight_knn': float(weight_knn),
-                'weight_svm': float(weight_svm)
-            }
-
-            classification_results[f"epoch_{epoch}"] = classification_info
-
-            # 使用覆盖模式更新测试结果信息
-            update_nested_yaml_entry(
-                yaml_file_path,
-                [f'models', mode, 'classification_history', f'epoch{epoch}'],
-                classification_info
-            )
-
             if enable_plots:
                 # 确保保存目录存在
                 os.makedirs(confusion_save_dir, exist_ok=True)
@@ -297,11 +245,5 @@ def test_classification(
             # tsne_3d_plot(feature_clf[0],labels=label_clf)
         print("=============================")
 
-    # 记录实验结果
-    final_results = {
-        "classification": classification_results,
-        "model_dir": model_dir
-    }
-    logger.update_experiment_result(exp_id, final_results)
 
     return

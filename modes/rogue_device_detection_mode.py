@@ -7,7 +7,6 @@ from sklearn.decomposition import PCA
 from sklearn.neighbors import KNeighborsClassifier
 
 from core.config import Mode, PCA_DIM_TEST
-from experiment_logger import ExperimentLogger
 from plot.roc_plot import evaluate_and_plot_roc
 from training_utils.data_preprocessor import load_generate_triplet, load_data, generate_spectrogram, load_model
 
@@ -61,23 +60,6 @@ def test_rogue_device_detection(
         mode = 'origin'
     model_dir = os.path.join(model_dir, mode)
 
-    # 初始化实验记录
-    logger = ExperimentLogger()
-    exp_config = {
-        "mode": "rogue_device_detection",
-        "model": {
-            "type": net_type.value
-        },
-        "data": {
-            "preprocess_type": preprocess_type.value,
-            "test_points": test_list,
-            "enrol_file": file_path_enrol,
-            "legitimate_file": file_path_legitimate,
-            "rogue_file": file_path_rogue
-        }
-    }
-    exp_filepath, exp_id = logger.create_experiment_record(exp_config)
-
     # 加载和处理数据
     """
     加载注册设备数据
@@ -122,8 +104,6 @@ def test_rogue_device_detection(
     triplet_data_test = [
         torch.tensor(x).float() for x in triplet_data_test
     ]
-
-    detection_results = {}
 
     for epoch in test_list or []:
         print()
@@ -176,18 +156,5 @@ def test_rogue_device_detection(
             fpr, tpr, roc_auc, eer, eer_threshold = evaluate_and_plot_roc(
                 label_test, detection_score, epoch
             )
-
-            detection_results[f"epoch_{epoch}"] = {
-                "auc": float(roc_auc),
-                "eer": float(eer),
-                "eer_threshold": float(eer_threshold)
-            }
-
-    # 记录实验结果
-    final_results = {
-        "rogue_detection": detection_results,
-        "model_dir": model_dir
-    }
-    logger.update_experiment_result(exp_id, final_results)
 
     return

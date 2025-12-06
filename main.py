@@ -1,6 +1,6 @@
 """项目主入口文件"""
-from core.config import set_seed
-from core.controller import main, Mode
+from core.config import set_seed, Mode
+from core.controller import main
 
 
 if __name__ == "__main__":
