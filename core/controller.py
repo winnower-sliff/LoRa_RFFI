@@ -68,7 +68,7 @@ def run_train_mode(config):
         net_type=config.NET_TYPE,
         preprocess_type=config.PROPRECESS_TYPE,
         test_list=config.TEST_LIST,
-        model_dir=config.ORIGIN_MODEL_DIR,
+        model_dir=config.MODEL_DIR,
     )
 
 
@@ -249,7 +249,7 @@ def run_distillation_mode(config):
         test_classification(
             config.mode,
             file_path_enrol="dataset/Train/dataset_training_no_aug.h5",
-            file_path_clf="dataset/Test/dataset_seen_devices.h5 ",
+            file_path_clf="dataset/Test/dataset_seen_devices.h5",
             dev_range_enrol=np.arange(0, 30, dtype=int),
             pkt_range_enrol=np.arange(400, 450, dtype=int),
             dev_range_clf=np.arange(0, 30, dtype=int),
@@ -262,7 +262,7 @@ def run_distillation_mode(config):
             pps_for=config.PPS_FOR,
             is_pac=config.IS_PCA_TEST,
         )
-    if config.DISTILLATE_MODE == 0 or config.DISTILLATE_MODE == 4:
+    if config.DISTILLATE_MODE == 4:
 
         print_colored_text("蒸馏后的甄别恶意模式", "32")
 

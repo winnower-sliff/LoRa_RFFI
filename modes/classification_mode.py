@@ -40,6 +40,7 @@ def test_classification(
     """
     * 使用给定的特征提取模型(从指定路径加载)对注册数据集和分类数据集进行分类测试。
 
+    :param mode: 模式，用于确定子目录名称及模型保存路径。
     :param file_path_enrol (str): 注册数据集的文件路径。
     :param file_path_clf (str): 分类数据集的文件路径。
     :param dev_range_enrol: 注册数据集中设备的范围。
@@ -114,7 +115,7 @@ def test_classification(
                     enrol_feature_extraction_time = time.time() - start_time
 
                 # 碎石图绘制逻辑
-                plot_scree = True
+                plot_scree = False
                 scree_max_components = 64
                 if plot_scree:
                     plot_pca_scree(feats=feature_enrol[0], max_components=scree_max_components)

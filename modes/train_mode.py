@@ -31,6 +31,7 @@ def train(mode, data, labels, batch_size=16, num_epochs=200, learning_rate=1e-3,
     6. 记录每个epoch的损失, 并在指定的轮次(test_list)保存模型状态字典。
     7. 在训练的最后几个轮次(test_list[-3:]), 绘制损失随epoch变化的图表并保存。
 
+    :param mode: 模式，用于确定子目录名称及模型保存路径。
     :param data: 输入数据, 通常为图像特征向量。
     :param labels: 输入数据的标签。
     :param batch_size: 批处理大小, 每次迭代训练的网络输入数量。默认为32。
@@ -43,7 +44,7 @@ def train(mode, data, labels, batch_size=16, num_epochs=200, learning_rate=1e-3,
     """
 
     # 子目录路径
-    if mode == Mode.CLASSIFICATION:
+    if mode == Mode.TRAIN:
         mode = 'origin'
     model_dir = os.path.join(model_dir, mode)
 
@@ -65,9 +66,6 @@ def train(mode, data, labels, batch_size=16, num_epochs=200, learning_rate=1e-3,
     # 训练模型
     model.to(DEVICE)
     model.train()
-
-    # 计算FLOPs和参数量
-    calculate_flops_and_params(model, train_dataset)
 
     print(
         "\n---------------------\n"

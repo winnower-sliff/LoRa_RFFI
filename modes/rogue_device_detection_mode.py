@@ -33,6 +33,7 @@ def test_rogue_device_detection(
     """
     该函数使用特征提取模型对恶意设备进行检测, 并返回相关的检测结果和性能指标。
 
+    :param mode: 模式，用于确定子目录名称及模型保存路径。
     :param file_path_enrol (str): 注册数据集的路径。
     :param dev_range_enrol (tuple): 注册数据集中设备的范围。
     :param pkt_range_enrol (tuple): 注册数据集中数据包的范围。

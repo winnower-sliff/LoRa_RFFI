@@ -5,7 +5,7 @@ import torch.nn as nn
 
 from net.net_MobileNet import mobilenet
 from net.net_DRSN import drsnet18
-from net.net_resnet import FeatureExtractor
+from net.net_ResNet import FeatureExtractor
 from net.net_prune import pruned_drsnet18
 from training_utils.TripletDataset import TripletLoss
 

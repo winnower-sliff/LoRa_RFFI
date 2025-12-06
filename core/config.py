@@ -64,7 +64,7 @@ class Config:
         # 设置模式
         self.mode = mode
         # 设置网络类型
-        self.NET_TYPE = NetworkType.LightNetV1
+        self.NET_TYPE = NetworkType.RESNET
         # 教师网络类型, 学生网络类型
         self.TEACHER_NET_TYPE = NetworkType.RESNET
         self.STUDENT_NET_TYPE = NetworkType.LightNetV1
