@@ -134,7 +134,7 @@ def train(mode, data, labels, batch_size=16, num_epochs=200, learning_rate=1e-3,
 
                 # 绘制loss折线图
                 if test_list and (epoch + 1) in test_list[-3:]:
-                    pic_save_path = model_dir + f"loss_{epoch+1}.png"
+                    pic_save_path = os.path.join(model_dir, f"loss_{epoch+1}.png")
                     plot_loss_curve(loss_per_epoch, num_epochs, net_type, preprocess_type, pic_save_path)
 
             # 更新总进度条

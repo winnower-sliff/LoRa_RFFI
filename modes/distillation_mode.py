@@ -15,7 +15,7 @@ import time
 from plot.loss_plot import plot_loss_curve
 from training_utils.TripletDataset import TripletDataset, TripletLoss
 from net.TripletNet import TripletNet
-from core.config import DEVICE, PCA_FILE_OUTPUT
+from core.config import DEVICE
 from training_utils.data_preprocessor import generate_spectrogram
 
 
@@ -34,6 +34,7 @@ def distillation(
     test_list=None,
     model_dir_path=None,
     is_pca=True,
+    pca_file_path=None,
 ):
     """
     使用知识蒸馏训练轻量级模型
@@ -52,14 +53,16 @@ def distillation(
     :param test_list: 测试点列表
     :param model_dir_path: 模型保存路径
     :param is_pca: 是否使用PCA降维处理特征（默认为True）
+    :param pca_file_path: PCA文件路径
     """
 
     if is_pca:
         # 加载 PCA
-        pca = np.load(PCA_FILE_OUTPUT)
+        pca = np.load(pca_file_path)
         W = torch.tensor(pca['components'].T, dtype=torch.float32).to(DEVICE)  # D_t x d
         mean = torch.tensor(pca['mean'], dtype=torch.float32).to(DEVICE)
         d = W.shape[1]
+        print(f"PCA dim: {d}")
         print("PCA data loaded!!!")
 
     # 数据集划分

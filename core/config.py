@@ -14,18 +14,13 @@ DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 H_VAL = 10  # 剪枝的粒度, 即决定剪枝的激进程度
 PRUNED_DATA_DIR = "./experiments/pruning_results/"  # 剪枝相关文件存放
 CUSTOM_PRUNING_FILE = os.path.join(PRUNED_DATA_DIR, "1-pr.csv")
-# PCA相关的配置
-PCA_DATA_DIR = "./experiments/pca_results/"
-PCA_FILE_INPUT = os.path.join(PCA_DATA_DIR, "teacher_feats.npz")
-PCA_FILE_OUTPUT = os.path.join(PCA_DATA_DIR, "pca_16.npz")
 
+# PCA相关的配置
 PCA_DIM_TRAIN = 8  # 训练时PCA的维度
 PCA_DIM_TEST = 8    # 测试时PCA的维度
 
 if not os.path.exists(PRUNED_DATA_DIR):
     os.makedirs(PRUNED_DATA_DIR)
-if not os.path.exists(PCA_DATA_DIR):
-    os.makedirs(PCA_DATA_DIR)
 
 
 # 定义运行模式的枚举
@@ -72,8 +67,8 @@ class Config:
         self.PROPRECESS_TYPE = PreprocessType.STFT
         # 0 for all, 1 for only prune, 2 for only test
         self.PRUNE_MODE = 0
-        # 0 for all, 1 for only distillate, 2 for only Fine-tuning, 3 for only test, 4 for only rogue
-        self.DISTILLATE_MODE = 4
+        # 0 for all, 1 for only distillate, 2 for only test, 3 for only rogue
+        self.DISTILLATE_MODE = 2
         # 蒸馏训练是否使用PCA
         self.IS_PCA_TRAIN = True
         # 测试时是否使用PCA

@@ -3,14 +3,14 @@ import os
 import numpy as np
 
 # 从配置模块导入配置、设备和模式枚举
-from core.config import Config, Mode, PreprocessType, PCA_FILE_INPUT, PCA_FILE_OUTPUT, PCA_DIM_TRAIN
+from core.config import Config, Mode, PreprocessType, PCA_DIM_TRAIN
 from modes.classification_mode import test_classification
 from modes.prune_mode import pruning
 from modes.rogue_device_detection_mode import test_rogue_device_detection
 from modes.train_mode import train
-from modes.distillation_mode import distillation, finetune_with_awgn
+from modes.distillation_mode import distillation
 from training_utils.data_preprocessor import prepare_train_data
-from utils.PCA import perform_pca, extract_features
+from utils.PCA import pca_perform, pca_extract_features
 from utils.better_print import print_colored_text
 
 
@@ -179,6 +179,42 @@ def run_distillation_mode(config):
 
         print_colored_text("蒸馏模式", "32")
 
+        # PCA相关的路径
+        PCA_DATA_DIR = os.path.join(config.TEACHER_MODEL_DIR, "pca_results")
+        PCA_FILE_INPUT = os.path.join(PCA_DATA_DIR, "teacher_feats.npz")
+        PCA_FILE_OUTPUT = os.path.join(PCA_DATA_DIR, "pca_16.npz")
+        if not os.path.exists(PCA_DATA_DIR):
+            os.makedirs(PCA_DATA_DIR)
+
+        if config.IS_PCA_TRAIN:
+            data, labels = prepare_train_data(
+                config.new_file_flag,
+                config.filename_train_prepared_data,
+                path_train_original_data="dataset/Train/dataset_training_no_aug.h5",
+                dev_range=np.arange(0, 10, dtype=int),
+                pkt_range=np.arange(0, 400, dtype=int),
+                snr_range=np.arange(20, 80),
+                generate_type=config.PROPRECESS_TYPE,
+                WST_J=config.WST_J,
+                WST_Q=config.WST_Q,
+            )
+            # 提取教师模型特征
+            if not os.path.exists(PCA_FILE_INPUT):
+                pca_extract_features(data, labels, batch_size=128,
+                                 model_path=os.path.join(config.TEACHER_MODEL_DIR, "origin/Extractor_200.pth"),  # 默认使用第200轮的模型
+                                 output_path=PCA_FILE_INPUT,
+                                 teacher_net_type=config.TEACHER_NET_TYPE,
+                                 preprocess_type=PreprocessType.STFT
+                            )
+                print("PCA extract done.")
+            # 执行PCA
+            if not os.path.exists(PCA_FILE_OUTPUT):
+                pca_perform(
+                    input_file=PCA_FILE_INPUT,
+                    output_file=PCA_FILE_OUTPUT,
+                    n_components=PCA_DIM_TRAIN
+                )
+
         # 准备训练数据
         data, labels = prepare_train_data(
             config.new_file_flag,
@@ -192,24 +228,11 @@ def run_distillation_mode(config):
             WST_Q=config.WST_Q,
         )
 
-        # 提取教师模型特征
-        if config.IS_PCA_TRAIN and not os.path.exists(PCA_FILE_INPUT):
-            extract_features(data, labels, batch_size=128,
-                             model_path=config.TEACHER_MODEL_DIR + "origin/Extractor_200.pth",  # 默认使用第200轮的模型
-                             output_path=PCA_FILE_INPUT,
-                             teacher_net_type=config.TEACHER_NET_TYPE, preprocess_type=PreprocessType.STFT
-                             )
-            print("PCA extract done.")
-        # 执行PCA
-        if config.IS_PCA_TRAIN and not os.path.exists(PCA_FILE_OUTPUT):
-            perform_pca(input_file=PCA_FILE_INPUT, output_file=PCA_FILE_OUTPUT, n_components=PCA_DIM_TRAIN)
-            print("PCA done.")
-
         # 执行蒸馏训练
         student_model = distillation(
             data,
             labels,
-            teacher_model_path=config.TEACHER_MODEL_DIR + "origin/Extractor_200.pth",  # 默认使用第200轮的模型
+            teacher_model_path=os.path.join(config.TEACHER_MODEL_DIR, "origin/Extractor_200.pth"),  # 默认使用第200轮的模型
             num_epochs=max(config.TEST_LIST),
             temperature=3.0,
             alpha=0.7,
@@ -217,29 +240,12 @@ def run_distillation_mode(config):
             student_net_type=config.STUDENT_NET_TYPE,
             preprocess_type=config.PROPRECESS_TYPE,
             test_list=config.TEST_LIST,
-            model_dir_path=config.STUDENT_MODEL_DIR + "distillation/",
+            model_dir_path=os.path.join(config.STUDENT_MODEL_DIR, "distillation/"),
             is_pca=config.IS_PCA_TRAIN,
+            pca_file_path=PCA_FILE_OUTPUT,
         )
 
-    if config.DISTILLATE_MODE == 2:
-
-        # 微调阶段 - 使用不同SNR级别的噪声数据
-        # snr_levels = [[30, 40], [20, 30], [10, 20], [0, 10]]  # 可以定义多个SNR范围
-        snr_levels = [[20, 30], [10, 20], [0, 10]]  # 可以定义多个SNR范围
-
-        for snr_range in snr_levels:
-            finetuned_model = finetune_with_awgn(
-                data=data,
-                labels=labels,
-                pretrained_model_path=config.STUDENT_MODEL_DIR + "distillation/Extractor_best1.pth",
-                snr_range=snr_range,
-                net_type=config.STUDENT_NET_TYPE,
-                preprocess_type=config.PROPRECESS_TYPE,
-                test_list=[10, 20, 30, 50],
-                model_dir_path=config.STUDENT_MODEL_DIR + "distillation/"
-            )
-
-    if config.DISTILLATE_MODE == 0 or config.DISTILLATE_MODE == 3:
+    if config.DISTILLATE_MODE == 0 or config.DISTILLATE_MODE == 2:
 
         # 测试最终模型
         print("测试模型...")
@@ -248,21 +254,22 @@ def run_distillation_mode(config):
         # 执行分类测试
         test_classification(
             config.mode,
-            file_path_enrol="dataset/Train/dataset_training_no_aug.h5",
-            file_path_clf="dataset/Test/dataset_seen_devices.h5",
-            dev_range_enrol=np.arange(0, 30, dtype=int),
-            pkt_range_enrol=np.arange(400, 450, dtype=int),
-            dev_range_clf=np.arange(0, 30, dtype=int),
-            pkt_range_clf=np.arange(0, 400, dtype=int),
+            file_path_enrol="dataset/Test/dataset_residential.h5",
+            file_path_clf="dataset/Test/channel_problem/moving_meeting_room.h5",
+            dev_range_enrol=np.arange(31, 40, dtype=int),
+            pkt_range_enrol=np.arange(0, 400, dtype=int),
+            dev_range_clf=np.arange(31, 40, dtype=int),
+            pkt_range_clf=np.arange(0, 200, dtype=int),
             net_type=config.STUDENT_NET_TYPE,
             preprocess_type=config.PROPRECESS_TYPE,
             test_list=config.TEST_LIST,
-            # snr_range=np.arange(10, 20),
+            # snr_range=np.arange(20, 30),
             model_dir=config.STUDENT_MODEL_DIR,
             pps_for=config.PPS_FOR,
             is_pac=config.IS_PCA_TEST,
         )
-    if config.DISTILLATE_MODE == 4:
+
+    if config.DISTILLATE_MODE == 3:
 
         print_colored_text("蒸馏后的甄别恶意模式", "32")
 
@@ -281,7 +288,7 @@ def run_distillation_mode(config):
             net_type=config.NET_TYPE,
             preprocess_type=config.PROPRECESS_TYPE,
             test_list=config.TEST_LIST,
-            model_dir=config.MODEL_DIR,
+            model_dir=config.STUDENT_MODEL_DIR,
             wst_j=config.WST_J,
             wst_q=config.WST_Q,
         )
