@@ -6,6 +6,7 @@ import numpy as np
 import torch
 from enum import Enum
 
+from paths import get_model_path
 
 # 设备配置
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -82,13 +83,13 @@ class Config:
         self.WST_Q = 6
 
 
-        # 后续设置
+        # 生成模型路径设置
         self.PPS_FOR = "stft" if self.PREPROCESS_TYPE == PreprocessType.STFT else "wst"
 
         if self.PREPROCESS_TYPE == PreprocessType.STFT:
-            self.MODEL_DIR= f"./model/{self.PPS_FOR}/{self.NET_TYPE.value}/"
-            self.TEACHER_MODEL_DIR = f"./model/{self.PPS_FOR}/{self.TEACHER_NET_TYPE.value}/"
-            self.STUDENT_MODEL_DIR = f"./model/{self.PPS_FOR}/{self.STUDENT_NET_TYPE.value}/"
+            self.MODEL_DIR= get_model_path(self.PPS_FOR, self.NET_TYPE)
+            self.TEACHER_MODEL_DIR = get_model_path(self.PPS_FOR, self.TEACHER_NET_TYPE)
+            self.STUDENT_MODEL_DIR = get_model_path(self.PPS_FOR, self.STUDENT_NET_TYPE)
             self.filename_train_prepared_data = f"train_data_{self.PPS_FOR}.h5"
         else:
             self.ORIGIN_MODEL_DIR_PATH = f"./model/{self.PPS_FOR}_j{self.WST_J}q{self.WST_Q}/{self.NET_TYPE}/"
@@ -96,12 +97,19 @@ class Config:
             self.STUDENT_MODEL_DIR = f"./model/{self.PPS_FOR}_j{self.WST_J}q{self.WST_Q}/{self.STUDENT_NET_TYPE.value}/"
             self.filename_train_prepared_data = f"train_data_{self.PPS_FOR}_j{self.WST_J}q{self.WST_Q}.h5"
 
+
+        # PCA相关的路径
+        self.PCA_DATA_DIR = os.path.join(self.TEACHER_MODEL_DIR, "pca_results")
+        self.PCA_FILE_INPUT = os.path.join(self.PCA_DATA_DIR, "teacher_feats.npz")
+        self.PCA_FILE_OUTPUT = os.path.join(self.PCA_DATA_DIR, "pca_16.npz")
+
         # 确保目录存在
         self._ensure_directories()
 
     def _ensure_directories(self):
         """确保模型目录存在"""
-        directories = [self.MODEL_DIR, self.TEACHER_MODEL_DIR, self.STUDENT_MODEL_DIR]
+        directories = [self.MODEL_DIR, self.TEACHER_MODEL_DIR, self.STUDENT_MODEL_DIR, self.PCA_DATA_DIR]
+
         for directory in directories:
             os.makedirs(directory, exist_ok=True)
 

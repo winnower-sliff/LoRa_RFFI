@@ -7,7 +7,7 @@ from sklearn.decomposition import PCA
 from sklearn.neighbors import KNeighborsClassifier
 
 from core.config import Mode, PCA_DIM_TEST
-from plot.roc_plot import evaluate_and_plot_roc
+from plot.plot_roc import evaluate_and_plot_roc
 from training_utils.data_preprocessor import load_generate_triplet, load_data, generate_spectrogram, load_model
 
 

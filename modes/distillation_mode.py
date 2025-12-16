@@ -12,7 +12,7 @@ import torch.optim as optim
 import torch.nn.functional as F
 import time
 
-from plot.loss_plot import plot_loss_curve
+from plot.plot_loss import plot_loss_curve
 from training_utils.TripletDataset import TripletDataset, TripletLoss
 from net.TripletNet import TripletNet
 from core.config import DEVICE
@@ -341,5 +341,3 @@ def finetune_with_awgn(
                 tqdm.write(f"Fine-tuned model saved to {file_path}")
 
             total_bar.update(1)
-
-    return model

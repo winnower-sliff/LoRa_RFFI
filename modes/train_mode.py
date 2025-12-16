@@ -12,7 +12,7 @@ from tqdm import tqdm
 # 从配置模块导入设备
 from core.config import DEVICE, Mode
 from net.TripletNet import TripletNet
-from plot.loss_plot import plot_loss_curve
+from plot.plot_loss import plot_loss_curve
 from training_utils.TripletDataset import TripletDataset, TripletLoss
 
 

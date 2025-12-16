@@ -47,7 +47,7 @@ def plot_confusion_matrices(wwo_cms, wwo_accs, epoch, net_type, pps_for, vote_si
         fontsize=16,
     )
 
-    pic_save_path = os.path.join(save_dir, f"cft_{epoch}.png")
+    pic_save_path = os.path.join(save_dir, f"/cft_{epoch}.png")
     plt.savefig(pic_save_path)
     print(f"Png save path: {pic_save_path}")
     # plt.show()

@@ -12,7 +12,7 @@ from sklearn.neighbors import KNeighborsClassifier
 from sklearn.svm import SVC
 
 from core.config import Mode, PCA_DIM_TEST  # Config枚举型
-from plot.confusion_plot import plot_confusion_matrices
+from plot.plot_confusion import plot_confusion_matrices
 from training_utils.data_preprocessor import load_generate_triplet, load_model
 # 工具包
 from utils.FLOPs import calculate_flops_and_params
