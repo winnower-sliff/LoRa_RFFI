@@ -1,12 +1,10 @@
 # TripletNet类，用于创建三元组网络
-import numpy as np
 import torch
 import torch.nn as nn
 
 from net.net_MobileNet import mobilenet
 from net.net_DRSN import drsnet18
 from net.net_ResNet import FeatureExtractor
-from net.net_prune import pruned_drsnet18
 from training_utils.TripletDataset import TripletLoss
 
 from core.config import NetworkType
@@ -14,9 +12,8 @@ from core.config import NetworkType
 
 class TripletNet(nn.Module):
     def __init__(self, net_type, in_channels,
-                 custom_pruning_file=None,
-                 use_pytorch_prune=True,   # 新增：是否使用PyTorch原生剪枝
-                margin=0.1
+                 margin=0.1,
+                 width_multiplier=1 / 16,
         ):
         super(TripletNet, self).__init__()
         self.margin = margin
@@ -27,26 +24,14 @@ class TripletNet(nn.Module):
             self.embedding_net = drsnet18(in_channels=in_channels)
 
         elif net_type == NetworkType.MobileNetV1:  # 添加 MobileNetV1 支持
-            width_multiplier = 1 / 16
             self.embedding_net = mobilenet(version='v1', in_channels=in_channels, width_multiplier=width_multiplier)
 
         elif net_type == NetworkType.MobileNetV2:  # 添加 MobileNetV2 支持
-            width_multiplier = 1 / 16
             self.embedding_net = mobilenet(version='v2', in_channels=in_channels, width_multiplier=width_multiplier)
 
-        elif net_type == NetworkType.LightNetV1:
-            width_multiplier = 1 / 16
-            self.embedding_net = mobilenet(version='lightV1', in_channels=in_channels, width_multiplier=width_multiplier)
+        elif net_type == NetworkType.LightNet:
+            self.embedding_net = mobilenet(version='light', in_channels=in_channels, width_multiplier=width_multiplier)
 
-        elif net_type == 3:
-            if use_pytorch_prune:
-                # PyTorch原生剪枝模式：先创建原始网络，稍后应用剪枝
-                self.embedding_net = drsnet18(in_channels=in_channels)
-            else:
-                # 加载剪枝率
-                r = np.loadtxt(custom_pruning_file, delimiter=",")
-                r = [1 - x for x in r]
-                self.embedding_net = pruned_drsnet18(r, in_channels=in_channels)
         # 其他网络类型可以继续添加...
 
     def forward(self, anchor, positive, negative):

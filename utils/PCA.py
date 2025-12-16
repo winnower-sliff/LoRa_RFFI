@@ -168,7 +168,7 @@ if __name__ == '__main__':
         dev_range=np.arange(0, 40, dtype=int),
         pkt_range=np.arange(0, 800, dtype=int),
         snr_range=np.arange(20, 80),
-        generate_type=config.PROPRECESS_TYPE,
+        generate_type=config.PREPROCESS_TYPE,
         WST_J=config.WST_J,
         WST_Q=config.WST_Q,
     )

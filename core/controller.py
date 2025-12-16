@@ -3,9 +3,8 @@ import os
 import numpy as np
 
 # 从配置模块导入配置、设备和模式枚举
-from core.config import Config, Mode, PreprocessType, PCA_DIM_TRAIN
+from core.config import Config, Mode, PreprocessType, PCA_DIM_TRAIN, DistillateMode
 from modes.classification_mode import test_classification
-from modes.prune_mode import pruning
 from modes.rogue_device_detection_mode import test_rogue_device_detection
 from modes.train_mode import train
 from modes.distillation_mode import distillation
@@ -31,7 +30,6 @@ def main(mode=Mode.TRAIN):
         Mode.TRAIN: run_train_mode,
         Mode.CLASSIFICATION: run_classification_mode,
         Mode.ROGUE_DEVICE_DETECTION: run_rogue_device_detection_mode,
-        Mode.PRUNE: run_pruning_mode,
         Mode.DISTILLATION: run_distillation_mode,
     }
 
@@ -54,7 +52,7 @@ def run_train_mode(config):
         dev_range=np.arange(0, 40, dtype=int),
         pkt_range=np.arange(0, 800, dtype=int),
         snr_range=np.arange(20, 80),
-        generate_type=config.PROPRECESS_TYPE,
+        generate_type=config.PREPROCESS_TYPE,
         WST_J=config.WST_J,
         WST_Q=config.WST_Q,
     )
@@ -66,7 +64,7 @@ def run_train_mode(config):
         labels,
         num_epochs=max(config.TEST_LIST),
         net_type=config.NET_TYPE,
-        preprocess_type=config.PROPRECESS_TYPE,
+        preprocess_type=config.PREPROCESS_TYPE,
         test_list=config.TEST_LIST,
         model_dir=config.MODEL_DIR,
     )
@@ -79,18 +77,21 @@ def run_classification_mode(config):
     # 执行分类任务
     test_classification(
         config.mode,
-        file_path_enrol="dataset/Train/dataset_training_no_aug.h5",
+        file_path_enrol="dataset/Train/dataset_training_aug.h5",
         file_path_clf="dataset/Test/dataset_seen_devices.h5",
-        dev_range_enrol=np.arange(0, 30, dtype=int),
-        pkt_range_enrol=np.arange(200, 300, dtype=int),
-        dev_range_clf=np.arange(0, 30, dtype=int),
+        # file_path_enrol="dataset/Test/dataset_residential.h5",
+        # file_path_clf="dataset/Test/channel_problem/moving_office.h5",
+        dev_range_enrol=np.arange(0, 40, dtype=int),
+        pkt_range_enrol=np.arange(0, 400, dtype=int),
+        dev_range_clf=np.arange(0, 40, dtype=int),
         pkt_range_clf=np.arange(0, 200, dtype=int),
         net_type=config.NET_TYPE,
-        preprocess_type=config.PROPRECESS_TYPE,
+        preprocess_type=config.PREPROCESS_TYPE,
         test_list=config.TEST_LIST,
         # snr_range=np.arange(20, 30),
         model_dir=config.MODEL_DIR,
         pps_for=config.PPS_FOR,
+        is_pac = config.IS_PCA_TEST
     )
 
 
@@ -102,82 +103,29 @@ def run_rogue_device_detection_mode(config):
     test_rogue_device_detection(
         config.mode,
         file_path_enrol="dataset/Train/dataset_training_no_aug.h5",
-        dev_range_enrol=np.arange(0, 30, dtype=int),
-        pkt_range_enrol=np.arange(0, 100, dtype=int),
+        dev_range_enrol=np.arange(0, 40, dtype=int),
+        pkt_range_enrol=np.arange(0, 200, dtype=int),
         file_path_legitimate="dataset/Test/dataset_seen_devices.h5",
-        dev_range_legitimate=np.arange(0, 30, dtype=int),
-        pkt_range_legitimate=np.arange(100, 200, dtype=int),
+        dev_range_legitimate=np.arange(0, 40, dtype=int),
+        pkt_range_legitimate=np.arange(200, 400, dtype=int),
         file_path_rogue="dataset/Test/dataset_rogue.h5",
-        dev_range_rogue=np.arange(40, 45, dtype=int),
+        dev_range_rogue=np.arange(40, 46, dtype=int),
         pkt_range_rogue=np.arange(0, 200, dtype=int),
         net_type=config.NET_TYPE,
-        preprocess_type=config.PROPRECESS_TYPE,
+        preprocess_type=config.PREPROCESS_TYPE,
         test_list=config.TEST_LIST,
         model_dir=config.MODEL_DIR,
         wst_j=config.WST_J,
         wst_q=config.WST_Q,
+        is_pac=config.IS_PCA_TEST
     )
-
-
-def run_pruning_mode(config):
-    """剪枝模式"""
-
-    if config.prune_mode == 0 or config.prune_mode == 1:
-
-        print_colored_text("剪枝模式", "32")
-
-        data, labels = prepare_train_data(
-            config.new_file_flag,
-            config.filename_train_prepared_data,
-            path_train_original_data="dataset/Train/dataset_training_no_aug.h5",
-            dev_range=np.arange(0, 10, dtype=int),
-            pkt_range=np.arange(0, 300, dtype=int),
-            snr_range=np.arange(20, 80),
-            generate_type=config.PROPRECESS_TYPE,
-            WST_J=config.WST_J,
-            WST_Q=config.WST_Q,
-        )
-
-        # 执行剪枝任务
-        pruning(
-            data,
-            labels,
-            model_dir=config.MODEL_DIR,
-            config=config,
-            net_type=config.NET_TYPE,
-            preprocess_type=config.PROPRECESS_TYPE,
-            test_list=config.TEST_LIST,
-        )
-
-    if config.prune_mode == 0 or config.prune_mode == 2:
-
-        # 测试最终模型
-        print("测试模型...")
-        print_colored_text("剪枝后的分类模式", "32")
-
-        # 执行分类任务
-        test_classification(
-            config.mode,
-            file_path_enrol="dataset/Train/dataset_training_no_aug.h5",
-            file_path_clf="dataset/Test/dataset_seen_devices.h5",
-            dev_range_enrol=np.arange(0, 20, dtype=int),
-            pkt_range_enrol=np.arange(0, 200, dtype=int),
-            dev_range_clf=np.arange(0, 20, dtype=int),
-            pkt_range_clf=np.arange(0, 200, dtype=int),
-            net_type=config.NET_TYPE,
-            preprocess_type=config.PROPRECESS_TYPE,
-            test_list=config.TEST_LIST,
-            model_dir=config.MODEL_DIR,
-            pps_for=config.PPS_FOR,
-        )
 
 
 def run_distillation_mode(config):
     """蒸馏模式"""
 
-    if config.DISTILLATE_MODE == 0 or config.DISTILLATE_MODE == 1:
-
-        print_colored_text("蒸馏模式", "32")
+    if config.DISTILLATE_MODE in [DistillateMode.ALL, DistillateMode.ONLY_DISTILLATE]:
+        print_colored_text("蒸馏训练模式", "32")
 
         # PCA相关的路径
         PCA_DATA_DIR = os.path.join(config.TEACHER_MODEL_DIR, "pca_results")
@@ -189,12 +137,12 @@ def run_distillation_mode(config):
         if config.IS_PCA_TRAIN:
             data, labels = prepare_train_data(
                 config.new_file_flag,
-                config.filename_train_prepared_data,
+                config.filename_train_prepared_data,           
                 path_train_original_data="dataset/Train/dataset_training_no_aug.h5",
-                dev_range=np.arange(0, 10, dtype=int),
-                pkt_range=np.arange(0, 400, dtype=int),
+                dev_range=np.arange(0, 40, dtype=int),
+                pkt_range=np.arange(0, 800, dtype=int),
                 snr_range=np.arange(20, 80),
-                generate_type=config.PROPRECESS_TYPE,
+                generate_type=config.PREPROCESS_TYPE,
                 WST_J=config.WST_J,
                 WST_Q=config.WST_Q,
             )
@@ -206,7 +154,6 @@ def run_distillation_mode(config):
                                  teacher_net_type=config.TEACHER_NET_TYPE,
                                  preprocess_type=PreprocessType.STFT
                             )
-                print("PCA extract done.")
             # 执行PCA
             if not os.path.exists(PCA_FILE_OUTPUT):
                 pca_perform(
@@ -223,7 +170,7 @@ def run_distillation_mode(config):
             dev_range=np.arange(0, 40, dtype=int),
             pkt_range=np.arange(0, 800, dtype=int),
             snr_range=np.arange(20, 80),
-            generate_type=config.PROPRECESS_TYPE,
+            generate_type=config.PREPROCESS_TYPE,
             WST_J=config.WST_J,
             WST_Q=config.WST_Q,
         )
@@ -238,30 +185,27 @@ def run_distillation_mode(config):
             alpha=0.7,
             teacher_net_type=config.TEACHER_NET_TYPE,
             student_net_type=config.STUDENT_NET_TYPE,
-            preprocess_type=config.PROPRECESS_TYPE,
+            preprocess_type=config.PREPROCESS_TYPE,
             test_list=config.TEST_LIST,
             model_dir_path=os.path.join(config.STUDENT_MODEL_DIR, "distillation/"),
             is_pca=config.IS_PCA_TRAIN,
             pca_file_path=PCA_FILE_OUTPUT,
         )
 
-    if config.DISTILLATE_MODE == 0 or config.DISTILLATE_MODE == 2:
-
-        # 测试最终模型
-        print("测试模型...")
+    if config.DISTILLATE_MODE in [DistillateMode.ALL, DistillateMode.ONLY_TEST]:
         print_colored_text("蒸馏后的分类模式", "32")
 
         # 执行分类测试
         test_classification(
             config.mode,
-            file_path_enrol="dataset/Test/dataset_residential.h5",
-            file_path_clf="dataset/Test/channel_problem/moving_meeting_room.h5",
-            dev_range_enrol=np.arange(31, 40, dtype=int),
+            file_path_enrol="dataset/Train/dataset_training_aug.h5",
+            file_path_clf="dataset/Test/dataset_seen_devices.h5",
+            dev_range_enrol=np.arange(0, 40, dtype=int),
             pkt_range_enrol=np.arange(0, 400, dtype=int),
-            dev_range_clf=np.arange(31, 40, dtype=int),
+            dev_range_clf=np.arange(0, 40, dtype=int),
             pkt_range_clf=np.arange(0, 200, dtype=int),
             net_type=config.STUDENT_NET_TYPE,
-            preprocess_type=config.PROPRECESS_TYPE,
+            preprocess_type=config.PREPROCESS_TYPE,
             test_list=config.TEST_LIST,
             # snr_range=np.arange(20, 30),
             model_dir=config.STUDENT_MODEL_DIR,
@@ -269,8 +213,7 @@ def run_distillation_mode(config):
             is_pac=config.IS_PCA_TEST,
         )
 
-    if config.DISTILLATE_MODE == 3:
-
+    if config.DISTILLATE_MODE == DistillateMode.ONLY_ROGUE:
         print_colored_text("蒸馏后的甄别恶意模式", "32")
 
         # 执行恶意设备检测任务
@@ -278,17 +221,18 @@ def run_distillation_mode(config):
             config.mode,
             file_path_enrol="dataset/Train/dataset_training_no_aug.h5",
             dev_range_enrol=np.arange(0, 30, dtype=int),
-            pkt_range_enrol=np.arange(0, 200, dtype=int),
+            pkt_range_enrol=np.arange(0, 400, dtype=int),
             file_path_legitimate="dataset/Test/dataset_seen_devices.h5",
             dev_range_legitimate=np.arange(0, 30, dtype=int),
-            pkt_range_legitimate=np.arange(100, 200, dtype=int),
+            pkt_range_legitimate=np.arange(0, 200, dtype=int),
             file_path_rogue="dataset/Test/dataset_rogue.h5",
-            dev_range_rogue=np.arange(40, 45, dtype=int),
+            dev_range_rogue=np.arange(40, 46, dtype=int),
             pkt_range_rogue=np.arange(0, 200, dtype=int),
-            net_type=config.NET_TYPE,
-            preprocess_type=config.PROPRECESS_TYPE,
+            net_type=config.STUDENT_NET_TYPE,
+            preprocess_type=config.PREPROCESS_TYPE,
             test_list=config.TEST_LIST,
             model_dir=config.STUDENT_MODEL_DIR,
             wst_j=config.WST_J,
             wst_q=config.WST_Q,
+            is_pac = config.IS_PCA_TEST
         )

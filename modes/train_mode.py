@@ -14,7 +14,6 @@ from core.config import DEVICE, Mode
 from net.TripletNet import TripletNet
 from plot.loss_plot import plot_loss_curve
 from training_utils.TripletDataset import TripletDataset, TripletLoss
-from utils.FLOPs import calculate_flops_and_params
 
 
 def train(mode, data, labels, batch_size=16, num_epochs=200, learning_rate=1e-3,
