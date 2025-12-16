@@ -86,6 +86,7 @@ def test_classification(
     print("\nData loaded!!!")
 
     model_dir = os.path.join(model_dir, mode)
+    print(f"PCA used!!" if is_pac else "PCA not used!!")
 
     for epoch in test_list or []:
         print()
@@ -120,20 +121,21 @@ def test_classification(
                 if plot_scree:
                     plot_pca_scree(feats=feature_enrol[0], max_components=scree_max_components)
 
-                pca = PCA(n_components=PCA_DIM_TEST)
-                pca.fit(feature_enrol[0])  # 只用 enrollment 特征
-                feature_enrol_pca = pca.transform(feature_enrol[0])  # 投影到低维
+                if is_pac:
+                    pca = PCA(n_components=PCA_DIM_TEST)
+                    pca.fit(feature_enrol[0])  # 只用 enrollment 特征
+                    feature_enrol_pca = pca.transform(feature_enrol[0])  # 投影到低维
 
                 # 使用 K-NN 分类器进行训练
-                knnclf = KNeighborsClassifier(n_neighbors=100, metric="euclidean")
-                knnclf.fit(feature_enrol[0], label_enrol.ravel())
-                # knnclf.fit(feature_enrol_pca, label_enrol.ravel())
-
+                knnclf = KNeighborsClassifier(n_neighbors=5, metric="euclidean")
+                # 使用 SVM 分类器进行训练
                 svmclf = SVC(kernel="rbf", C=1.0)  # 可以根据需要调整参数
                 if is_pac:
                     svmclf.fit(feature_enrol_pca, label_enrol.ravel())
+                    knnclf.fit(feature_enrol_pca, label_enrol.ravel())
                 else:
                     svmclf.fit(feature_enrol[0], label_enrol.ravel())
+                    knnclf.fit(feature_enrol[0], label_enrol.ravel())
             finally:
                 text.stop()
 
@@ -154,16 +156,15 @@ def test_classification(
 
                 start_time = time.time()
 
-                # SVM 投影到 PCA, 按道理说KNN不需要
-                feature_clf_pca = pca.transform(feature_clf[0])
-
                 # K-NN和SVM的初步预测
-                pred_label_knn_wo = knnclf.predict(feature_clf[0])
-                # pred_label_knn_wo = knnclf.predict(feature_clf_pca)
                 if is_pac:
+                    # SVM 投影到 PCA, 按道理说KNN不需要
+                    feature_clf_pca = pca.transform(feature_clf[0])
                     pred_label_svm_wo = svmclf.predict(feature_clf_pca)
+                    pred_label_knn_wo = knnclf.predict(feature_clf_pca)
                 else:
                     pred_label_svm_wo = svmclf.predict(feature_clf[0])
+                    pred_label_knn_wo = knnclf.predict(feature_clf[0])
 
                 def apply_voting(labels, vote_size):
                     """应用滑动窗口投票机制"""
@@ -246,5 +247,13 @@ def test_classification(
             # tsne_3d_plot(feature_clf[0],labels=label_clf)
         print("=============================")
 
-
-    return
+    return {
+        "knn_wo": wo_acc_knn,
+        "svm_wo": wo_acc_svm,
+        "knn_w": w_acc_knn,
+        "svm_w": w_acc_svm,
+        "combined": acc_combined,
+        "time_enrol": enrol_feature_extraction_time,
+        "time_clf_feat": clf_feature_extraction_time,
+        "time_predict": prediction_time  # 包含分类特征提取+分类器预测+投票的总时间
+    }

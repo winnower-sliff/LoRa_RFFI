@@ -60,6 +60,10 @@ def test_rogue_device_detection(
     if mode == Mode.ROGUE_DEVICE_DETECTION:
         mode = 'origin'
     model_dir = os.path.join(model_dir, mode)
+    print(f"PCA used!!" if is_pac else "PCA not used!!")
+
+    # 投票参数
+    vote_size = 10
 
     # 加载和处理数据
     """
@@ -127,11 +131,10 @@ def test_rogue_device_detection(
             # 构建 K-NN 分类器
             knnclf = KNeighborsClassifier(n_neighbors=15, metric="euclidean")
 
-            pca = PCA(n_components=PCA_DIM_TEST)
-            pca.fit(feature_enrol[0])  # 只用 enrollment 特征
-            feature_enrol_pca = pca.transform(feature_enrol[0])  # 投影到低维
-
             if is_pac:
+                pca = PCA(n_components=PCA_DIM_TEST)
+                pca.fit(feature_enrol[0])  # 只用 enrollment 特征
+                feature_enrol_pca = pca.transform(feature_enrol[0])  # 投影到低维
                 knnclf.fit(feature_enrol_pca, label_enrol.ravel())
             else:
                 knnclf.fit(feature_enrol[0], label_enrol.ravel())
@@ -146,16 +149,31 @@ def test_rogue_device_detection(
 
             print("Device predicting...")
             # 使用 K-NN 分类器进行预测
-            feature_clf_pca = pca.transform(feature_test[0])
             if is_pac:
+                feature_clf_pca = pca.transform(feature_test[0])
                 distances, _ = knnclf.kneighbors(feature_clf_pca)
             else:
                 distances, _ = knnclf.kneighbors(feature_test[0])
             detection_score = distances.mean(axis=1)
 
+            # 应用投票机制
+            def apply_voting(scores, vote_size):
+                """应用滑动窗口投票机制"""
+                voted_scores = []
+                for i in range(len(scores)):
+                    window_start = max(0, i - vote_size // 2)
+                    window_end = min(len(scores), i + vote_size // 2 + 1)
+                    window = scores[window_start:window_end]
+                    voted_score = np.mean(window)
+                    voted_scores.append(voted_score)
+                return voted_scores
+
+            # 应用投票机制到检测分数
+            detection_score_voted = apply_voting(detection_score, vote_size)
+
             # 调用评估和绘图函数
             fpr, tpr, roc_auc, eer, eer_threshold = evaluate_and_plot_roc(
-                label_test, detection_score, epoch
+                label_test, detection_score_voted, epoch
             )
 
     return
