@@ -205,7 +205,7 @@ def run_distillation_mode(config):
             is_pac=config.IS_PCA_TEST,
         )
 
-    if config.DISTILLATE_MODE == DistillateMode.ONLY_ROGUE:
+    if config.DISTILLATE_MODE == [DistillateMode.ALL, DistillateMode.ONLY_ROGUE]:
         print_colored_text("蒸馏后的甄别恶意模式", "32")
 
         # 执行恶意设备检测任务

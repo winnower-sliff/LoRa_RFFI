@@ -1,4 +1,4 @@
-# LoRa_RFFI 项目根目录
+# LoRa_RFFI 项目
 
 该目录包含了轻量级LoRa射频指纹识别项目的主要入口文件和其他核心组件。
 
@@ -36,9 +36,39 @@ LoRa_RFFI/
 python main.py
 ```
 
+# 推荐Pipeline流程
+
+1. 训练ResNet教师模型 
+首先训练一个高性能的ResNet作为教师模型：
+```angular2html
+# 在 main.py 中设置
+main(Mode.TRAIN, net_type=NetworkType.RESNET)
+```
+此阶段会：
+- 使用 train_no_aug 数据集进行训练
+- 生成ResNet教师模型并保存到 /model/ResNet/origin 目录
+- 为后续知识蒸馏提供强大的教师模型
+
+2. 知识蒸馏训练LightNet学生模型
+接着使用知识蒸馏训练轻量级LightNet模型：
+```
+# 在 main.py 中设置
+main(Mode.DISTILLATION, 
+     teacher_net_type=NetworkType.RESNET,
+     student_net_type=NetworkType.LightNet,
+     distillate_mode=DistillateMode.ALL)
+```
+此阶段会：
+- 加载预训练的ResNet教师模型
+- 提取教师模型特征并进行PCA降维（如果启用）
+- 使用教师模型的软标签指导LightNet学生模型训练
+- 学生模型保存到 /model/LightNet/distillation 目录
+- 同时分类测试和恶意检测
+
+
 # 数据集路径、模型保存根路径
 
-项目使用 [paths.py](file://F:\MyDocument\A竞赛科研项目\LoRa_RFFI\paths.py) 文件统一管理所有数据集路径、模型保存路径和其他文件路径，确保路径配置的一致性和可维护性。
+项目使用 [paths.py](paths.py) 文件统一管理所有数据集路径、模型保存路径和其他文件路径。
 
 - 数据集路径管理
 - 模型存放根路径管理
@@ -46,13 +76,13 @@ python main.py
 
 # 核心配置说明
 
-项目的核心配置在 `core/config.py` 文件中定义，包含了项目的全局设置和枚举类型：
+项目的核心配置在 [config.py](core/config.py) 文件中定义，包含了项目的全局设置和枚举类型：
 
 ### 设备配置
 - `DEVICE`: 自动检测并配置计算设备，优先使用CUDA GPU，否则回退到CPU
 
 ### 运行模式枚举(Mode)
-项目支持五种运行模式：
+项目支持运行模式：
 - `Mode.TRAIN`: 基础训练模式，用于训练基础模型
 - `Mode.CLASSIFICATION`: 分类模式，用于设备指纹分类任务
 - `Mode.ROGUE_DEVICE_DETECTION`: 恶意设备检测模式，用于检测非法设备
@@ -66,8 +96,9 @@ python main.py
 - `NetworkType.LightNet`: 改进的轻量级网络
 
 ### 预处理类型枚举(PreprocessType)
-支持三种数据预处理方式：
+支持数据预处理方式：
 - `PreprocessType.IQ`: IQ数据直接使用，2个通道（I和Q）
 - `PreprocessType.STFT`: 短时傅里叶变换，1个通道（幅度）
 - `PreprocessType.WST`: 小波散射变换，2个通道（实部和虚部）
 
+### 是否使用PCA降维
