@@ -14,9 +14,9 @@ from utils.PCA import pca_perform, pca_extract_features
 from utils.better_print import print_colored_text
 
 
-def main(mode=Mode.TRAIN):
+def main(mode=Mode.TRAIN, **kwargs):
     """主函数"""
-    config = Config(mode)
+    config = Config(mode, **kwargs)
 
     # 打印网络类型
     print(f"Running mode: {mode}")
