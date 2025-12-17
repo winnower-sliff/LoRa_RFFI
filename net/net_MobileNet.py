@@ -207,10 +207,10 @@ class ResidualDepthwiseSeparable(nn.Module):
             return x
 
 
-class LightNetV1(nn.Module):
+class LightNet(nn.Module):
     """轻量残差 MobileNetV1 特征提取器"""
     def __init__(self, in_channels, width_multiplier=1.0):
-        super(LightNetV1, self).__init__()
+        super(LightNet, self).__init__()
         self.width_multiplier = width_multiplier
 
         def conv_bn(inp, oup, stride):
@@ -266,5 +266,5 @@ def mobilenet(version, in_channels, width_multiplier=1.0):
         return MobileNetV1(in_channels, width_multiplier)
     if version == 'v2':
         return MobileNetV2(in_channels, width_multiplier)
-    if version == 'lightV1':
-        return LightNetV1(in_channels, width_multiplier)
+    if version == 'light':
+        return LightNet(in_channels, width_multiplier)

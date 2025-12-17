@@ -12,11 +12,10 @@ import torch.optim as optim
 import torch.nn.functional as F
 import time
 
-from experiment_logger import ExperimentLogger
-from plot.loss_plot import plot_loss_curve
+from plot.plot_loss import plot_loss_curve
 from training_utils.TripletDataset import TripletDataset, TripletLoss
 from net.TripletNet import TripletNet
-from core.config import DEVICE, PCA_FILE_OUTPUT
+from core.config import DEVICE
 from training_utils.data_preprocessor import generate_spectrogram
 
 
@@ -35,6 +34,7 @@ def distillation(
     test_list=None,
     model_dir_path=None,
     is_pca=True,
+    pca_file_path=None,
 ):
     """
     使用知识蒸馏训练轻量级模型
@@ -53,37 +53,16 @@ def distillation(
     :param test_list: 测试点列表
     :param model_dir_path: 模型保存路径
     :param is_pca: 是否使用PCA降维处理特征（默认为True）
+    :param pca_file_path: PCA文件路径
     """
-
-    # 初始化实验记录
-    logger = ExperimentLogger()
-    exp_config = {
-        "mode": "distillation",
-        "model": {
-            "teacher_type": teacher_net_type.value,
-            "student_type": student_net_type.value,
-            "parameters": {
-                "batch_size": batch_size,
-                "epochs": num_epochs,
-                "learning_rate": learning_rate,
-                "temperature": temperature,
-                "alpha": alpha
-            }
-        },
-        "data": {
-            "preprocess_type": preprocess_type,
-            "test_points": test_list,
-            "teacher_model_path": teacher_model_path
-        }
-    }
-    exp_filepath, exp_id = logger.create_experiment_record(exp_config)
 
     if is_pca:
         # 加载 PCA
-        pca = np.load(PCA_FILE_OUTPUT)
+        pca = np.load(pca_file_path)
         W = torch.tensor(pca['components'].T, dtype=torch.float32).to(DEVICE)  # D_t x d
         mean = torch.tensor(pca['mean'], dtype=torch.float32).to(DEVICE)
         d = W.shape[1]
+        print(f"PCA dim: {d}")
         print("PCA data loaded!!!")
 
     # 数据集划分
@@ -236,18 +215,6 @@ def distillation(
             # 更新总进度条
             total_bar.update(1)
 
-    # 记录实验结果
-    final_results = {
-        "distillation": {
-            "final_loss": loss_ep,
-            "total_epochs": num_epochs,
-            "temperature": temperature,
-            "alpha": alpha,
-            "model_saved_path": model_dir_path
-        }
-    }
-    logger.update_experiment_result(exp_id, final_results)
-
     return student_model
 
 
@@ -374,5 +341,3 @@ def finetune_with_awgn(
                 tqdm.write(f"Fine-tuned model saved to {file_path}")
 
             total_bar.update(1)
-
-    return model

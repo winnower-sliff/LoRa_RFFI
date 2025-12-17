@@ -48,6 +48,8 @@ def calculate_flops_and_params(model, triplet_data):
             total_flops, params = profile(model, inputs=(dummy_a, dummy_p, dummy_n), verbose=False)
             print(f"FLOPs: {total_flops / 1e6:.6f}M")
             print(f"Params: {params / 1e3:.2f}K")
+
+        return total_flops, params
     except ImportError:
         print("THOP not installed. Please install it using 'pip install thop'")
     except Exception as e:

@@ -7,8 +7,7 @@ from sklearn.decomposition import PCA
 from sklearn.neighbors import KNeighborsClassifier
 
 from core.config import Mode, PCA_DIM_TEST
-from experiment_logger import ExperimentLogger
-from plot.roc_plot import evaluate_and_plot_roc
+from plot.plot_roc import evaluate_and_plot_roc
 from training_utils.data_preprocessor import load_generate_triplet, load_data, generate_spectrogram, load_model
 
 
@@ -34,6 +33,7 @@ def test_rogue_device_detection(
     """
     该函数使用特征提取模型对恶意设备进行检测, 并返回相关的检测结果和性能指标。
 
+    :param mode: 模式，用于确定子目录名称及模型保存路径。
     :param file_path_enrol (str): 注册数据集的路径。
     :param dev_range_enrol (tuple): 注册数据集中设备的范围。
     :param pkt_range_enrol (tuple): 注册数据集中数据包的范围。
@@ -60,23 +60,10 @@ def test_rogue_device_detection(
     if mode == Mode.ROGUE_DEVICE_DETECTION:
         mode = 'origin'
     model_dir = os.path.join(model_dir, mode)
+    print(f"PCA used!!" if is_pac else "PCA not used!!")
 
-    # 初始化实验记录
-    logger = ExperimentLogger()
-    exp_config = {
-        "mode": "rogue_device_detection",
-        "model": {
-            "type": net_type.value
-        },
-        "data": {
-            "preprocess_type": preprocess_type.value,
-            "test_points": test_list,
-            "enrol_file": file_path_enrol,
-            "legitimate_file": file_path_legitimate,
-            "rogue_file": file_path_rogue
-        }
-    }
-    exp_filepath, exp_id = logger.create_experiment_record(exp_config)
+    # 投票参数
+    vote_size = 10
 
     # 加载和处理数据
     """
@@ -123,8 +110,6 @@ def test_rogue_device_detection(
         torch.tensor(x).float() for x in triplet_data_test
     ]
 
-    detection_results = {}
-
     for epoch in test_list or []:
         print()
         model_path = os.path.join(model_dir, f"Extractor_{epoch}.pth")
@@ -146,11 +131,10 @@ def test_rogue_device_detection(
             # 构建 K-NN 分类器
             knnclf = KNeighborsClassifier(n_neighbors=15, metric="euclidean")
 
-            pca = PCA(n_components=PCA_DIM_TEST)
-            pca.fit(feature_enrol[0])  # 只用 enrollment 特征
-            feature_enrol_pca = pca.transform(feature_enrol[0])  # 投影到低维
-
             if is_pac:
+                pca = PCA(n_components=PCA_DIM_TEST)
+                pca.fit(feature_enrol[0])  # 只用 enrollment 特征
+                feature_enrol_pca = pca.transform(feature_enrol[0])  # 投影到低维
                 knnclf.fit(feature_enrol_pca, label_enrol.ravel())
             else:
                 knnclf.fit(feature_enrol[0], label_enrol.ravel())
@@ -165,29 +149,31 @@ def test_rogue_device_detection(
 
             print("Device predicting...")
             # 使用 K-NN 分类器进行预测
-            feature_clf_pca = pca.transform(feature_test[0])
             if is_pac:
+                feature_clf_pca = pca.transform(feature_test[0])
                 distances, _ = knnclf.kneighbors(feature_clf_pca)
             else:
                 distances, _ = knnclf.kneighbors(feature_test[0])
             detection_score = distances.mean(axis=1)
 
+            # 应用投票机制
+            def apply_voting(scores, vote_size):
+                """应用滑动窗口投票机制"""
+                voted_scores = []
+                for i in range(len(scores)):
+                    window_start = max(0, i - vote_size // 2)
+                    window_end = min(len(scores), i + vote_size // 2 + 1)
+                    window = scores[window_start:window_end]
+                    voted_score = np.mean(window)
+                    voted_scores.append(voted_score)
+                return voted_scores
+
+            # 应用投票机制到检测分数
+            detection_score_voted = apply_voting(detection_score, vote_size)
+
             # 调用评估和绘图函数
             fpr, tpr, roc_auc, eer, eer_threshold = evaluate_and_plot_roc(
-                label_test, detection_score, epoch
+                label_test, detection_score_voted, epoch
             )
-
-            detection_results[f"epoch_{epoch}"] = {
-                "auc": float(roc_auc),
-                "eer": float(eer),
-                "eer_threshold": float(eer_threshold)
-            }
-
-    # 记录实验结果
-    final_results = {
-        "rogue_detection": detection_results,
-        "model_dir": model_dir
-    }
-    logger.update_experiment_result(exp_id, final_results)
 
     return

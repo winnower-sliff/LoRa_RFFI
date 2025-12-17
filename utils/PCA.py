@@ -12,7 +12,7 @@ from training_utils.TripletDataset import TripletDataset
 from training_utils.data_preprocessor import prepare_train_data
 
 
-def extract_features(
+def pca_extract_features(
         data,
         labels,
         batch_size,
@@ -67,7 +67,7 @@ def extract_features(
     print("Teacher features saved, shape:", feats.shape)
 
 
-def perform_pca(input_file="teacher_feats.npz", output_file="pca_16.npz", n_components=16):
+def pca_perform(input_file="teacher_feats.npz", output_file="pca_16.npz", n_components=16):
     """
     对输入特征进行PCA降维处理
     
@@ -168,26 +168,26 @@ if __name__ == '__main__':
         dev_range=np.arange(0, 40, dtype=int),
         pkt_range=np.arange(0, 800, dtype=int),
         snr_range=np.arange(20, 80),
-        generate_type=config.PROPRECESS_TYPE,
+        generate_type=config.PREPROCESS_TYPE,
         WST_J=config.WST_J,
         WST_Q=config.WST_Q,
     )
 
     # 提取特征
-    extract_features(
+    pca_extract_features(
         data, labels,
         batch_size=128,
         model_path="../model/stft/ResNet/origin/Extractor_200.pth",
-        output_path="../experiments/pca_results/teacher_feats_origintrain.npz",
+        output_path="../model/stft/ResNet_no_aug/distilled/pca_results/teacher_feats_origintrain.npz",
         teacher_net_type=NetworkType.RESNET,
         preprocess_type=PreprocessType.STFT
     )
 
     # 执行PCA
-    # perform_pca()
+    # pca_perform()
 
     # 绘制碎石图
-    plot_pca_scree(input_file="../experiments/pca_results/teacher_feats_origintrain.npz",
+    plot_pca_scree(input_file="../model/stft/ResNet_no_aug/distilled/pca_results/teacher_feats_origintrain.npz",
                    max_components=16,
-                   save_path="../experiments/pca_results/pca_scree_origintrain.png"
-    )
+                   save_path="../model/stft/ResNet_no_aug/distilled/pca_results/pca_scree_origintrain.png"
+                   )

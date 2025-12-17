@@ -16,8 +16,8 @@ def generate_spectrogram(data, generate_type, wst_j=6, wst_q=6):
     """
     数据预处理方式选择
 
-    - PROPRECESS_TYPE : 0 信道独立的STFT
-    - PROPRECESS_TYPE : 1 小波散射变换
+    - PREPROCESS_TYPE : 0 信道独立的STFT
+    - PREPROCESS_TYPE : 1 小波散射变换
     """
     # TF_Transformer = TimeFrequencyTransformer()
     if generate_type == PreprocessType.STFT:
@@ -66,12 +66,12 @@ def prepare_train_data(
         new_file_flag,
         filename_train_prepared_data,
         path_train_original_data,
-        dev_range,
-        pkt_range,
-        snr_range,
-        generate_type,
-        WST_J,
-        WST_Q,
+        dev_range=None,
+        pkt_range=None,
+        snr_range=None,
+        generate_type=None,
+        WST_J=None,
+        WST_Q=None,
 ):
     """
     准备训练集
@@ -80,12 +80,12 @@ def prepare_train_data(
     """
     time_prepare_start = time.time()
     # 数据预处理
-    if not os.path.exists(filename_train_prepared_data) or new_file_flag == 1:
+    if not os.path.exists(filename_train_prepared_data) or new_file_flag == True:
         # 需要新处理数据
         print("Data Converting...")
 
         data, labels = load_data(path_train_original_data, dev_range, pkt_range)
-        if generate_type != PreprocessType.IQ:
+        if generate_type != PreprocessType.IQ and snr_range is not None:
             data = awgn(data, snr_range)
 
         if generate_type != PreprocessType.IQ:
@@ -108,7 +108,7 @@ def prepare_train_data(
         print(f"Load Time Cost: {timeCost:.3f}s")
     return data, labels
 
-def load_model(file_path, net_type, generate_type=None, weights_only=True, is_quantized_model=False):
+def load_model(file_path, net_type, generate_type=None, weights_only=True):
     """从指定路径加载模型"""
     model = TripletNet(net_type=net_type, in_channels=generate_type.in_channels)
     model.load_state_dict(torch.load(file_path, weights_only=weights_only))
