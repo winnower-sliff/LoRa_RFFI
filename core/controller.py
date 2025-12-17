@@ -20,11 +20,11 @@ def main(mode=Mode.TRAIN, **kwargs):
 
     # 打印网络类型
     print(f"Running mode: {mode}")
-    if config_obj.mode == config.Mode.DISTILLATION:
-        print(f"Teacher Net TYPE: {config_obj.TEACHER_NET_TYPE}")
-        print(f"Student Net TYPE: {config_obj.STUDENT_NET_TYPE}")
+    if config.mode == Mode.DISTILLATION:
+        print(f"Teacher Net TYPE: {config.TEACHER_NET_TYPE}")
+        print(f"Student Net TYPE: {config.STUDENT_NET_TYPE}")
     else:
-        print(f"Net TYPE: {config_obj.NET_TYPE}")
+        print(f"Net TYPE: {config.NET_TYPE}")
 
     # 使用字典映射替代 if-elif-else 结构
     mode_functions = {
@@ -36,7 +36,7 @@ def main(mode=Mode.TRAIN, **kwargs):
 
     # 执行对应模式的函数
     if mode in mode_functions:
-        mode_functions[mode](config_obj)
+        mode_functions[mode](config)
     else:
         raise ValueError(f"Unknown mode: {mode}")
 
