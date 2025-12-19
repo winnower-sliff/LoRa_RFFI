@@ -10,6 +10,7 @@ from paths import get_model_path
 
 # 设备配置
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+print(f"Using device: {DEVICE}")
 
 # PCA相关的配置
 PCA_DIM_TRAIN = 16  # 训练时PCA的维度

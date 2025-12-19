@@ -18,3 +18,7 @@
 *.iml
 workspace.xml
 tasks.xml
+
+model/
+
+.gitignore
